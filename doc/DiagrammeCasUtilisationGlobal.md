@@ -13,8 +13,8 @@
 │          │        │    │   GESTION DE PARTIE      │       │
 │          │        │    │                          │       │
 │  JOUEUR  │────────┼───►│  • Jouer en solo         │       │
-│          │        │    │  • Créer partie multi    │       │
-│          │        │    │  • Rejoindre partie      │       │
+│          │        │    │  • Créer partie P2P      │       │
+│          │        │    │  • Rejoindre partie P2P  │       │
 └────┬─────┘        │    │                          │       │
      │              │    └──────────────────────────┘       │
      │              │                                       │
@@ -24,7 +24,7 @@
      └──────────────┼───►│  • Se déplacer           │       │
      │              │    │  • Combattre             │       │
      │              │    │  • Interagir avec PNJ    │       │
-     └──────────────┼───►│  • Chat (multijoueur)    │       │
+     └──────────────┼───►│  • Chat (P2P)            │       │
                     │    │                          │       │
                     │    └──────────────────────────┘       │
                     │                                       │
@@ -36,14 +36,17 @@
                     │    └──────────────────────────┘       │
                     │                                       │
                     └───────────────────────────────────────┘
-                                     ▲
-                                     │
-                        ┌────────────┴────────────┐
-                        │                         │
-                   ┌────┴─────┐            ┌─────┴──────┐
-                   │ Système  │            │ Générateur │
-                   │    IA    │            │  Niveaux   │
-                   └──────────┘            └────────────┘
+                     ▲              ▲
+                     │              │
+       ┌─────────────┘              └───────────────┐
+       │                                            │
+┌──────┴──────┐                               ┌─────┴───────┐
+│ Système IA  │                               │ Autres      │
+│ (Monstres + │                               │ joueurs     │
+│   PNJ)      │                               │   (P2P)     │
+└─────────────┘                               └─────────────┘
+
+                             
 ```
 
 ---
@@ -58,20 +61,23 @@
                         │                                 │
 ┌──────────┐            │  ┌───────────────────────┐      │
 │          │            │  │ CU01: Jouer en solo   │      │
-│  JOUEUR  │────────────┼─►│                       │      │
-│          │            │  └───────────────────────┘      │
-└────┬─────┘            │                                 │
+│  JOUEUR  │────────────┼─►│ (charger une carte,   │      │
+│          │            │  │ lancer la partie)     │      │
+└────┬─────┘            │  └───────────────────────┘      │
+     │                  │                                 │
      │                  │  ┌───────────────────────┐      │
      │                  │  │ CU02: Créer partie    │      │
-     └──────────────────┼─►│       multijoueur     │      │
+     └──────────────────┼─►│       P2P (hôte)      │      │
      │                  │  └───────────────────────┘      │
      │                  │                                 │
      │                  │  ┌───────────────────────┐      │
      │                  │  │ CU03: Rejoindre       │      │
-     └──────────────────┼─►│       partie multi    │      │
+     └──────────────────┼─►│       partie P2P      │      │
+                        │  │       (client)        │      │
                         │  └───────────────────────┘      │
                         │                                 │
                         └─────────────────────────────────┘
+
 ```
 
 ---
@@ -84,7 +90,7 @@
                         │                                 │
 ┌──────────┐            │  ┌───────────────────────┐      │
 │          │            │  │ CU04: Se déplacer     │      │
-│  JOUEUR  │────────────┼─►│       dans labyrinthe │      │
+│  JOUEUR  │────────────┼─►│       dans le niveau  │      │
 │          │            │  └───────────────────────┘      │
 └────┬─────┘            │                                 │
      │                  │  ┌───────────────────────┐      │
@@ -94,36 +100,41 @@
      │                  │                                 │
      │                  │  ┌───────────────────────┐      │
      │                  │  │ CU06: Interagir       │      │
-     └──────────────────┼─►│       avec PNJ        │      │
+     └──────────────────┼─►│       avec un PNJ     │      │
      │                  │  └───────────────────────┘      │
      │                  │                                 │
      │                  │  ┌───────────────────────┐      │
      │                  │  │ CU07: Chat textuel    │      │
-     └──────────────────┼─►│    (multijoueur)      │      │
+     └──────────────────┼─►│    (P2P, multijoueur) │      │
                         │  └───────────────────────┘      │
                         │                                 │
                         └─────────────────────────────────┘
+
 ```
 
 ---
 
-### Module 4 : Systèmes internes
+### Module 3 : Systèmes internes
 
 ```
     ┌─────────────────────────────────┐
-    │   SYSTÈMES INTERNES             │
+    │   MODULE 3 : SYSTÈMES INTERNES  │
     │                                 │
     │  ┌───────────────────────┐      │
-    │  │ CU09: Gérer ennemis   │      │
-    │  │       (IA)            │      │
+    │  │ CU09: Gérer IA        │      │
+    │  │  (monstres + PNJ)     │      │
     │  └───────────────────────┘      │
     │             │                   │
+    │             │ utilise           │
+    │             ▼                   │
     │  ┌───────────────────────┐      │
     │  │ CU10: Synchroniser    │      │
     │  │       état du jeu     │      │
+    │  │       (P2P)           │      │
     │  └───────────────────────┘      │
     │                                 │
     └─────────────────────────────────┘
+
 ```
 
 ---
@@ -133,37 +144,40 @@
 ### Dépendances principales
 
 ```
-    CU01: Jouer solo
+    CU01: Jouer en solo
          │
-         │ Base pour
+         │ Base pour la logique de jeu
          ▼
-    CU02: Créer partie ──┐
-         │               │
-         │               ├──► CU10: Synchroniser
-         ▼               │
-    CU03: Rejoindre ─────┘
-         │
-         │
-         ▼
-    CU07: Chat
-
-
-    CU04: Déplacement
+    CU04: Se déplacer
          │
          │ Nécessaire pour
          ▼
-    CU05: Combat
-
-
-    CU01: Jouer solo
+    CU05: Combattre
+         │
+         │
+         ▼
+    CU06: Interagir avec PNJ
          │
          │ Inclut
          ▼
-    CU09: Gérer IA
+    CU09: Gérer IA (monstres + PNJ)
+
+
+    CU02: Créer partie P2P ──┐
+         │                   │
+         │                   ├──► CU10: Synchroniser
+         ▼                   │        état du jeu (P2P)
+    CU03: Rejoindre P2P ─────┘
+         │
+         │
+         ▼
+    CU07: Chat textuel (P2P)
+
 ```
 
 ---
 
 
-**Date** : 4 novembre 2025  
-**Version** : 1.0
+**Date**    : 6 novembre 2025
+**Version** : 1.1 (suppression du générateur de niveaux, passage complet en P2P)
+
