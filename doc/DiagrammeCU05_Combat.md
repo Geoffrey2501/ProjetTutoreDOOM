@@ -129,8 +129,6 @@
      │                                │  vers Ennemi IA) │
      │                                │                  │
      │ 8. Animation tir               │                  │
-     │    + muzzle flash              │                  │
-     │    + son tir NORMAL            │                  │
      ◄────────────────────────────────┤                  │
      │    (pas de dégât)              │                  │
      │                                ├──────────────────┤
@@ -140,85 +138,89 @@
 
 ---
 
-## Scénario alternatif A6 - Validation serveur (multijoueur)
+## Scénario alternatif A6 - Combat P2P (multijoueur)
 
 ```
-┌──────────┐      ┌──────────────┐      ┌──────────┐      ┌──────────┐
-│ Client1  │      │   Serveur    │      │ Ennemi   │      │ Client2  │
-│(Tireur)  │      │ (Autorité)   │      │   IA     │      │(Témoin)  │
-└────┬─────┘      └──────┬───────┘      └─────┬────┘      └────┬─────┘
-     │                   │                    │                 │
-     │ 1. Tir local      │                    │                 │
-     │ (prédiction       │                    │                 │
-     │  client)          │                    │                 │
-     │ - Muzzle flash    │                    │                 │
-     │ - Son tir         │                    │                 │
-     │ (PAS de décrément)│                    │                 │
-     │                   │                    │                 │
-     │ 2. Envoi ACTION:  │                    │                 │
-     │    SHOOT {        │                    │                 │
-     │      shot_id: 42, │                    │                 │
-     │      weapon_id: 7,│                    │                 │
-     │      pos: [x,y,z],│                    │                 │
-     │      dir: [dx,dy],│                    │                 │
-     │      client_tick  │                    │                 │
-     │    }              │                    │                 │
-     ├──────────────────►│                    │                 │
-     │                   │                    │                 │
-     │                   │ 3. Validation      │                 │
-     │                   │ • Munitions > 0?   │                 │
-     │                   │ • Cadence OK?      │                 │
-     │                   │ • Cooldown OK?     │                 │
-     │                   │ • Reload OK?       │                 │
-     │                   │ • Anti-cheat       │                 │
-     │                   │   (shot_id dédup)  │                 │
-     │                   │                    │                 │
-     │                   │ 4. Raycast serveur │                 │
-     │                   │    (autoritaire)   │                 │
-     │                   │         │          │                 │
-     │                   │         └─────────►│                 │
-     │                   │                    │                 │
-     │                   ├─────[ alt: HIT ]───┤                 │
-     │                   │                    │                 │
-     │                   │ 5. HIT confirmé    │                 │
-     │                   │                    │                 │
-     │                   │ 6. Munition -1     │                 │
-     │                   │    (serveur)       │                 │
-     │                   │                    │                 │
-     │                   │ 7. ApplyDamage(20) │                 │
-     │                   ├───────────────────►│                 │
-     │                   │                    │                 │
-     │                   │                    │ HP: 100→80      │
-     │                   │                    │ Clamp[0,100]    │
-     │                   │                    │                 │
-     │ 8. ACK {          │                    │                 │
-     │      shot_id: 42, │                    │                 │
-     │      hit: true,   │                    │                 │
-     │      hp: 80,      │                    │                 │
-     │      ammo: 29,    │                    │                 │
-     │      correction?  │                    │                 │
-     │    }              │                    │                 │
-     ◄───────────────────┤                    │                 │
-     │                   │                    │                 │
-     │ 9. Réconciliation │                    │                 │
-     │    client         │                    │                 │
-     │    (shot_id dédup)│                    │                 │
-     │                   │                    │                 │
-     │                   │ 10. Broadcast état │                 │
-     │                   │     ENEMY_HIT {    │                 │
-     │                   │       enemy_id,    │                 │
-     │                   │       hp: 80       │                 │
-     │                   │     }              │                 │
-     │                   ├────────────────────┼────────────────►│
-     │                   │                    │                 │
-     │                   │                    │                 │ 11. Animation
-     │                   │                    │                 │     hit
-     │                   ├───────[ else ]─────┤                 │
-     │                   │                    │                 │
-     │                   │ (MISS: pas de msg  │                 │
-     │                   │  vers Ennemi IA)   │                 │
-     │                   │                    │                 │
-     ▼                   ▼                    ▼                 ▼
+┌──────────┐                                            ┌──────────┐       ┌──────────┐
+│ Joueur1  │                                            │ Joueur2  │       │ Joueur3  │
+│(Tireur)  │                                            │ (Cible)  │       │(Témoin)  │
+└────┬─────┘                                            └─────┬────┘       └────┬─────┘
+     │                                                        │                 │
+     │ 1. Vise Joueur2                                        │                 │
+     │    (souris)                                            │                 │
+     │                                                        │                 │
+     │ 2. Clique (tir)                                        │                 │
+     │                                                        │                 │
+     │ 3. Validation locale                                   │                 │
+     │ • Munitions > 0?                                       │                 │
+     │ • Cooldown OK?                                         │                 │
+     │ • Reload OK?                                           │                 │
+     │                                                        │                 │
+     │ 4. Raycast local                                       │                 │
+     │    (line of sight)                                     │                 │
+     │         │                                              │                 │
+     │         └──────────[ alt: HIT ]────────────────────────┤                 │
+     │                                                        │                 │
+     │ 5. Munition -1 (local)                                 │                 │
+     │                                                        │                 │
+     │ 6. Animation tir locale                                │                 │
+     │    + muzzle flash + son                                │                 │
+     │                                                        │                 │
+     │ 7. Envoi P2P: PLAYER_SHOT {                            │                 │
+     │      shooter_id: J1,                                   │                 │
+     │      target_id: J2,                                    │                 │
+     │      damage: 20,                                       │                 │
+     │      shot_id: 42,                                      │                 │
+     │      position, direction,                              │                 │
+     │      timestamp                                         │                 │
+     │    }                                                   │                 │
+     ├───────────────────────────────────────────────────────►│                 │
+     │                                                        │                 │
+     │                                                        │ 8. Validation   │
+     │                                                        │    réception    │
+     │                                                        │ • shot_id dédup │
+     │                                                        │ • Timestamp OK  │
+     │                                                        │                 │
+     │                                                        │ 9. ApplyDamage  │
+     │                                                        │    (20)         │
+     │                                                        │                 │
+     │                                                        │ HP: 100→80      │
+     │                                                        │ Clamp[0,100]    │
+     │                                                        │                 │
+     │                                                        │ 10. Animation   │
+     │                                                        │     hit + son   │
+     │                                                        │                 │
+     │ 11. ACK P2P: {                                         │                 │
+     │       shot_id: 42,                                     │                 │
+     │       hit: true,                                       │                 │
+     │       hp: 80                                           │                 │
+     │     }                                                  │                 │
+     ◄────────────────────────────────────────────────────────┤                 │
+     │                                                        │                 │
+     │ 12. Confirmation hit                                   │                 │
+     │     (feedback visuel)                                  │                 │
+     │                                                        │                 │
+     │                                                        │ 13. Broadcast   │
+     │                                                        │     P2P état:   │
+     │                                                        │     PLAYER_HIT {│
+     │                                                        │       target_id │
+     │                                                        │       hp: 80,   │
+     │                                                        │       shot_id   │
+     │                                                        │     }           │
+     │                                                        ├────────────────►│
+     │                                                        │                 │
+     │                                                        │                 │ 14. Affiche
+     │                                                        │                 │     animation
+     │                                                        │                 │     hit J2
+     │                                                        ├─────[ else: MISS ]────┤
+     │                                                        │                 │
+     │                                                        │ (Raycast local  │
+     │                                                        │  pas de HIT)    │
+     │                                                        │                 │
+     │                                                        │ (Pas d'ACK      │
+     │                                                        │  envoyé)        │
+     │                                                        │                 │
+     ▼                                                        ▼                 ▼
 
 ```
 

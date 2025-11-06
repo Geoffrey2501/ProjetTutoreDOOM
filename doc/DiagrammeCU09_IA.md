@@ -22,8 +22,6 @@
                             └────┬──────────────────────────────┬──────────────┘
                                  │                              ▲
                                  │ Joueur détecté               │
-                                 │ (FOV 120°, <10m,             │
-                                 │  pas obstacle)               │
                                  │                              │
                                  ▼                              │
                             ┌──────────────────────────────────┴──────────────┐
@@ -96,7 +94,7 @@
                                         │                       │
                                         ▼                       ▼
                               Retour PATROUILLE     ┌──────────────────────────┐
-                              (tous les états       │        ☠️ MORT            │
+                              (tous les états       │        ☠️ MORT           │
                               sauf MORT)            │                          │
                                                     │  Actions:                │
                                                     │  • Animation mort        │

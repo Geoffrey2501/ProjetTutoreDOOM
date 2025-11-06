@@ -7,9 +7,9 @@
 ```
 # Diagramme de séquence CU04 - Déplacement (Scénario nominal)
 
-┌─────────┐   ┌──────────────┐   ┌──────────────┐   ┌─────────┐   ┌──────────────┐   ┌──────────────┐
-│ Joueur  │   │ InputManager │   │   Player     │   │ Physics │   │  GameLoop    │   │  Renderer    │
-└────┬────┘   └──────┬───────┘   └──────┬───────┘   └────┬────┘   └──────┬───────┘   └──────┬───────┘
+┌─────────┐   ┌──────────────┐    ┌──────────────┐   ┌─────────┐    ┌──────────────┐    ┌──────────────┐
+│ Joueur  │   │ InputManager │    │   Player     │   │ Physics │    │  GameLoop    │    │  Renderer    │
+└────┬────┘   └──────┬───────┘    └──────┬───────┘   └────┬────┘    └──────┬───────┘    └──────┬───────┘
      │               │                   │                │                │                   │
      │ 1. Appuie     │                   │                │                │                   │
      │    sur 'Z'    │                   │                │                │                   │
@@ -115,7 +115,7 @@
      │                                │ 2. Détecte 2 inputs         │
      │                                │ 3. Calcule vecteur diag ↗   │
      │                                │ 4. Normalise vitesse        │
-     │                                │ 5. Vérifie collision OK ✅   │
+     │                                │ 5. Vérifie collision OK ✅  │
      │                                │ 6. Met à jour position      │
      │                                │                             │
      │                                │ 7. Demande nouveau rendu    │

@@ -1,4 +1,4 @@
-# Diagramme CU02 - Créer une Partie Multijoueur
+# Diagramme CU02 - Créer une Partie Multijoueur P2P
 
 ---
 
@@ -13,8 +13,7 @@
      │ creerPartie()                        │
      ├─────────────────────────────────────►│
      │                                      │
-     │                                      ├──┐ afficherChoixMode()
-     │                                      │  │ • Client-Serveur
+     │                                      ├──┐ 
      │                                      │  │ • P2P
      │                                      │◄─┘
      │                                      │
@@ -26,7 +25,7 @@
      │                                      │  │  taille carte)
      │                                      │◄─┘
      │      demandeConfig()                 │
-     │◄──────────────────────────────────────┤
+     │◄─────────────────────────────────────┤
      │                                      │
      │ valider(config)                      │
      ├─────────────────────────────────────►│
@@ -35,9 +34,8 @@
      │                                      │  │ (port 25565)
      │                                      │◄─┘
      │                                      │
-     │                                      ├──┐ genererLabyrinthe()
-     │                                      │  │ (Prim/Kruskal)
-     │                                      │  │
+     │                                      ├──┐ 
+     │                                      │  │ getLabyrinthe()
      │                                      │◄─┘
      │                                      │
      │      afficherAttente()               │
@@ -49,7 +47,7 @@
      │                                      │
      ▼                                      ▼
 ```
-Dans ce scénario nominal, le joueur (host) crée une partie multijoueur en choisissant le mode de jeu (Client-Serveur ou P2P), configure les paramètres, et le système génère le labyrinthe puis ouvre un socket pour attendre les connexions des autres joueurs.
+Dans ce scénario nominal, le joueur (host) crée une partie multijoueur en P2P, configure les paramètres de la partie, et le système récupère un labyrinthe (déjà près fait ou peut etre on affichera une liste des maps?) puis ouvre un socket pour attendre les connexions des autres joueurs.
 
 ---
 
@@ -74,7 +72,7 @@ Dans ce scénario nominal, le joueur (host) crée une partie multijoueur en choi
      │                                ├──┐ proposerAutrePort()
      │                                │◄─┘
      │      demandePort()             │
-     │◄────────────────────────────────┤
+     │◄───────────────────────────────┤
      │                                │
      │ saisirPort(25566)              │
      ├───────────────────────────────►│

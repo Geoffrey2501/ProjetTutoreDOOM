@@ -19,7 +19,7 @@
      │ true                                           │
      ├─ ─── ── ── ─── ─── ─── ─── ─── ─── ─── ─── ───►│
      │                                                │
-     │                                                ├──┐ genererLabyrinthe()
+     │                                                ├──┐ getLabyrinthe()
      │                                                │  │ 
      │                                                │  │
      │                                                │◄─┘
@@ -32,7 +32,7 @@
      │                                                │
      ▼                                                ▼
 ```
-Dans ce scénario nominal, le joueur démarre une nouvelle partie en solo. Le système affiche les paramètres de la partie, génère un labyrinthe et affiche le jeu avec la carte et la position initiale du joueur.
+Dans ce scénario nominal, le joueur démarre une nouvelle partie en solo. Le système affiche les paramètres de la partie, récupère un labyrinthe et affiche le jeu avec la carte et la position initiale du joueur.
 
 ---
 
