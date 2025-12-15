@@ -24,4 +24,5 @@ TestResults.xml
 ### IntelliJ IDEA ###
 .idea/
 out/
+bin/
 *.class

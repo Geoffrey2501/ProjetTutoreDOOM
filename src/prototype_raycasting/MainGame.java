@@ -25,6 +25,12 @@ public class MainGame implements Runnable {
 
         raycasting = new Raycasting(map, joueur);
 
+        // Exemple d'ajout d'autres joueurs (décommenter pour tester)
+        // Joueur autreJoueur1 = new Joueur(4.0, 4.0, 0.0);
+        // Joueur autreJoueur2 = new Joueur(3.0, 3.0, 0.0);
+        // raycasting.ajouterAutreJoueur(autreJoueur1);
+        // raycasting.ajouterAutreJoueur(autreJoueur2);
+
         raycasting.addKeyListener(input);
         raycasting.addMouseListener(input);
         raycasting.addMouseMotionListener(input);
