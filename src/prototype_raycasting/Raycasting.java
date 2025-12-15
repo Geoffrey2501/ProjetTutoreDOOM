@@ -5,6 +5,8 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Raycasting extends JFrame {
 
@@ -12,6 +14,7 @@ public class Raycasting extends JFrame {
     private boolean render;
     private Map map;
     private Joueur joueur;
+    private List<Joueur> autresJoueurs; // Liste des autres joueurs à afficher
     private int FOV = 60;
     private int NUM_RAYS = 1000; //"definition" de la qualite du rendu
 
@@ -21,6 +24,7 @@ public class Raycasting extends JFrame {
 
         this.map = m;
         this.joueur = j;
+        this.autresJoueurs = new ArrayList<>();
 
         //booleen pour ne pas rendre à l'initialisation du panel
         render = false;
@@ -178,6 +182,63 @@ public class Raycasting extends JFrame {
             g.setColor(wallColor);
             g.fillRect(x1, drawStart, rayWidth, drawEnd - drawStart + 1);
         }
+
+        //dessiner les autres joueurs (sprites)
+        dessinerAutresJoueurs(g, screenWidth, screenHeight, joueurX, joueurY, joueurAngle);
+    }
+
+    //methode pour dessiner les autres joueurs comme des sprites
+    private void dessinerAutresJoueurs(Graphics g, int screenWidth, int screenHeight, 
+                                       double joueurX, double joueurY, double joueurAngle) {
+        for (Joueur autreJoueur : autresJoueurs) {
+            //calculer le vecteur relatif du joueur actuel vers l'autre joueur
+            double dx = autreJoueur.getX() - joueurX;
+            double dy = autreJoueur.getY() - joueurY;
+            
+            //calculer la distance
+            double distance = Math.sqrt(dx * dx + dy * dy);
+            
+            //ne pas dessiner si trop proche (éviter division par zéro et rendu bizarre)
+            if (distance < 0.1) continue;
+            
+            //calculer l'angle vers l'autre joueur
+            double angleVersJoueur = Math.atan2(dy, dx);
+            
+            //calculer l'angle relatif par rapport à la direction du joueur actuel
+            double angleRelatif = angleVersJoueur - joueurAngle;
+            
+            //normaliser l'angle entre -PI et PI
+            while (angleRelatif > Math.PI) angleRelatif -= 2 * Math.PI;
+            while (angleRelatif < -Math.PI) angleRelatif += 2 * Math.PI;
+            
+            //vérifier si l'autre joueur est dans le champ de vision
+            double fov = Math.toRadians(FOV);
+            if (Math.abs(angleRelatif) > fov / 2) continue; //hors du champ de vision
+            
+            //calculer la position x à l'écran (basée sur l'angle relatif)
+            //angleRelatif = 0 correspond au centre de l'écran
+            double screenX = (angleRelatif / fov + 0.5) * screenWidth;
+            
+            //calculer la taille du sprite en fonction de la distance
+            int spriteHeight = (int) (screenHeight / distance);
+            int spriteWidth = spriteHeight / 2; //sprite plus étroit que haut
+            
+            //limiter la taille
+            if (spriteHeight > screenHeight) spriteHeight = screenHeight;
+            if (spriteWidth > screenWidth / 4) spriteWidth = screenWidth / 4;
+            
+            //calculer la position y (centré verticalement)
+            int spriteY = (screenHeight - spriteHeight) / 2;
+            int spriteX = (int) (screenX - spriteWidth / 2);
+            
+            //dessiner le sprite (simple rectangle coloré pour l'instant)
+            g.setColor(new Color(255, 0, 0, 180)); //rouge semi-transparent
+            g.fillRect(spriteX, spriteY, spriteWidth, spriteHeight);
+            
+            //ajouter un contour pour mieux voir
+            g.setColor(new Color(255, 255, 0)); //jaune
+            g.drawRect(spriteX, spriteY, spriteWidth, spriteHeight);
+        }
     }
 
     //une methode qui permet de rendre une image avec un objet Map et un objet Joueur
@@ -193,5 +254,24 @@ public class Raycasting extends JFrame {
 
     public void setJoueur(Joueur joueur) {
         this.joueur = joueur;
+    }
+
+    //méthodes pour gérer les autres joueurs
+    public void ajouterAutreJoueur(Joueur joueur) {
+        if (!autresJoueurs.contains(joueur)) {
+            autresJoueurs.add(joueur);
+        }
+    }
+
+    public void retirerAutreJoueur(Joueur joueur) {
+        autresJoueurs.remove(joueur);
+    }
+
+    public void viderAutresJoueurs() {
+        autresJoueurs.clear();
+    }
+
+    public List<Joueur> getAutresJoueurs() {
+        return new ArrayList<>(autresJoueurs);
     }
 }
