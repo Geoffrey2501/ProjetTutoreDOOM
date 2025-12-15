@@ -23,3 +23,5 @@ TestResults.xml
 
 ### IntelliJ IDEA ###
 .idea/
+out/
+*.class
