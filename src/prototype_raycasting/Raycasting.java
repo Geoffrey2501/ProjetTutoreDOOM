@@ -190,6 +190,9 @@ public class Raycasting extends JFrame {
     //methode pour dessiner les autres joueurs comme des sprites
     private void dessinerAutresJoueurs(Graphics g, int screenWidth, int screenHeight, 
                                        double joueurX, double joueurY, double joueurAngle) {
+        //calculer le FOV une seule fois
+        double fov = Math.toRadians(FOV);
+        
         for (Joueur autreJoueur : autresJoueurs) {
             //calculer le vecteur relatif du joueur actuel vers l'autre joueur
             double dx = autreJoueur.getX() - joueurX;
@@ -212,7 +215,6 @@ public class Raycasting extends JFrame {
             while (angleRelatif < -Math.PI) angleRelatif += 2 * Math.PI;
             
             //vérifier si l'autre joueur est dans le champ de vision
-            double fov = Math.toRadians(FOV);
             if (Math.abs(angleRelatif) > fov / 2) continue; //hors du champ de vision
             
             //calculer la position x à l'écran (basée sur l'angle relatif)
