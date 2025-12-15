@@ -23,3 +23,8 @@ TestResults.xml
 
 ### IntelliJ IDEA ###
 .idea/
+target/
+*.class
+*.iml
+*.xml
+
