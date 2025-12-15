@@ -46,6 +46,9 @@ public class ClientHandler implements Runnable {
     public void run() {
         try {
             playerId = in.readLine();
+            if (playerId == null) {
+                return; // Connexion fermée avant identification
+            }
             System.out.println("Joueur enregistré: " + playerId);
 
             out.println("CONNECTED:" + playerId);
@@ -58,14 +61,21 @@ public class ClientHandler implements Runnable {
 
                 server.broadcastMessage(playerId + ":" + message, this);
             }
+            // Déconnexion normale (readLine retourne null)
+            System.out.println("Joueur déconnecté: " + playerId);
         } catch (IOException e) {
-            System.out.println("Erreur de communication avec " + playerId);
+            // Vérifier si c'est une fermeture de socket normale
+            if (!socket.isClosed()) {
+                System.out.println("Erreur de communication avec " + playerId);
+            }
         } finally {
             try {
-                socket.close();
+                if (!socket.isClosed()) {
+                    socket.close();
+                }
                 server.removeClient(this);
             } catch (IOException e) {
-                e.printStackTrace();
+                // Ignorer les erreurs de fermeture
             }
         }
     }
@@ -76,15 +86,29 @@ public class ClientHandler implements Runnable {
      * @param action Action à traiter (format: "X,Y")
      */
     private void processAction(String action) {
+        // Ignorer les actions null ou vides
+        if (action == null || action.trim().isEmpty()) {
+            return;
+        }
+
         try {
             String[] coords = action.split(",");
-            if (coords.length == 2) {
-                posX = Integer.parseInt(coords[0]);
-                posY = Integer.parseInt(coords[1]);
-                System.out.println(playerId + " -> (" + posX + ", " + posY + ")");
+
+            // Vérifier qu'on a exactement 2 coordonnées
+            if (coords.length != 2) {
+                return; // Format invalide, ignorer silencieusement
             }
+
+            // Vérifier que les coordonnées ne sont pas vides
+            if (coords[0].trim().isEmpty() || coords[1].trim().isEmpty()) {
+                return; // Coordonnées vides, ignorer
+            }
+
+            posX = Integer.parseInt(coords[0].trim());
+            posY = Integer.parseInt(coords[1].trim());
+            System.out.println(playerId + " -> (" + posX + ", " + posY + ")");
         } catch (NumberFormatException e) {
-            System.err.println("Erreur parsing action: " + action);
+            // Coordonnées non numériques, ignorer silencieusement
         }
     }
 

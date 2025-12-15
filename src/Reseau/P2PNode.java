@@ -146,22 +146,56 @@ public class P2PNode {
      * @param sender  Connexion qui a envoyé le message
      */
     public void processMessageFromPeer(String message, GestionConnection sender) {
+        // Ignorer les messages null ou vides
+        if (message == null || message.trim().isEmpty()) {
+            return;
+        }
+
         try {
             String[] parts = message.split(":");
-            if (parts.length == 2) {
-                String playerId = parts[0];
-                String[] coords = parts[1].split(",");
-                int x = Integer.parseInt(coords[0]);
-                int y = Integer.parseInt(coords[1]);
-                playerPositions.put(playerId, new int[]{x, y});
-                System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
 
-                for (GestionConnection peer : connectedPeers) {
-                    if (peer != sender) {
-                        peer.sendMessage(message);
-                    }
+            // Vérifier que le message a le bon format "playerId:coords"
+            if (parts.length != 2) {
+                return; // Message mal formé, ignorer silencieusement
+            }
+
+            String playerId = parts[0];
+            String coordsStr = parts[1];
+
+            // Vérifier que le playerId n'est pas vide
+            if (playerId == null || playerId.trim().isEmpty()) {
+                return; // Pas de nom de joueur, ignorer
+            }
+
+            // Vérifier que les coordonnées sont présentes
+            if (coordsStr == null || coordsStr.trim().isEmpty()) {
+                return; // Pas de coordonnées, ignorer
+            }
+
+            String[] coords = coordsStr.split(",");
+
+            // Vérifier qu'on a exactement 2 coordonnées
+            if (coords.length != 2) {
+                return; // Format de coordonnées invalide
+            }
+
+            // Vérifier que les coordonnées ne sont pas vides
+            if (coords[0].trim().isEmpty() || coords[1].trim().isEmpty()) {
+                return; // Coordonnées vides
+            }
+
+            int x = Integer.parseInt(coords[0].trim());
+            int y = Integer.parseInt(coords[1].trim());
+            playerPositions.put(playerId, new int[]{x, y});
+            System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
+
+            for (GestionConnection peer : connectedPeers) {
+                if (peer != sender) {
+                    peer.sendMessage(message);
                 }
             }
+        } catch (NumberFormatException e) {
+            // Coordonnées non numériques, ignorer silencieusement
         } catch (Exception e) {
             System.err.println("[" + nodeId + "] Erreur parsing message: " + message);
         }
