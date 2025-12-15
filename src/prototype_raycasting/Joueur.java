@@ -32,6 +32,49 @@ public class Joueur {
     }
 
     public void setAngle(double angle) {
-        this.angle = angle;
+        this.angle = normalizeAngle(angle);
+    }
+
+    /**
+     * Rotation du joueur en degrés
+     * @param degrees nombre de degrés à ajouter (positif = sens horaire, négatif = sens antihoraire)
+     */
+    public void rotateDegrees(double degrees) {
+        angle = normalizeAngle(angle + Math.toRadians(degrees));
+    }
+
+    /**
+     * Rotation du joueur en radians
+     * @param radians nombre de radians à ajouter
+     */
+    public void rotateRadians(double radians) {
+        angle = normalizeAngle(angle + radians);
+    }
+
+    /**
+     * Normalise un angle entre 0 et 2π radians
+     * @param a l'angle à normaliser
+     * @return l'angle normalisé dans [0, 2π)
+     */
+    private double normalizeAngle(double a) {
+        a = a % (2 * Math.PI);
+        if (a < 0) {
+            a += 2 * Math.PI;
+        }
+        return a;
+    }
+
+    /**
+     * Obtenir l'angle en degrés
+     * @return l'angle en degrés
+     */
+    public double getAngleDegrees() {
+        return Math.toDegrees(angle);
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Joueur[x=%.2f, y=%.2f, angle=%.2f° (%.2f rad)]",
+                x, y, getAngleDegrees(), angle);
     }
 }
