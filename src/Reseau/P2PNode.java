@@ -6,25 +6,31 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Nœud Peer-to-Peer (P2P) pour le système multijoueur Doom-like
+ * Nœud Peer-to-Peer (P2P) pour le système multijoueur Doom-like avec maillage complet
  *
  * Chaque nœud agit à la fois comme client et serveur. Il peut :
  * - Accepter les connexions entrantes d'autres joueurs
  * - Se connecter à d'autres joueurs
+ * - Partager la liste des pairs connus avec les nouveaux connectés (maillage complet)
  * - Envoyer ses coordonnées (X, Y) à tous les pairs
  * - Recevoir et relayer les coordonnées des autres joueurs
  *
- * Format des messages : "NomJoueur:X,Y"
- * Exemple : "J1:100,200"
+ * Protocole des messages :
+ * - "MOVE:NomJoueur:X,Y" - Coordonnées d'un joueur
+ * - "PEER_LIST:J1@host1:port1;J2@host2:port2" - Liste des pairs connus
+ * - "NEW_PEER:JoueurX@host:port" - Annonce d'un nouveau pair au réseau
  *
  * @author Groupe DOOM
  * @version 1.0
  */
 public class P2PNode {
+
     private String nodeId;
     private int port;
+    private String host;
     private ServerSocket serverSocket;
     private List<GestionConnection> connectedPeers = new CopyOnWriteArrayList<>();
+    private Map<String, PeerInfo> knownPeers = new ConcurrentHashMap<>();
     private ExecutorService executor = Executors.newCachedThreadPool();
     private Map<String, int[]> playerPositions = new ConcurrentHashMap<>();
     private int posX = 0;
@@ -34,11 +40,15 @@ public class P2PNode {
      * Constructeur du nœud P2P
      *
      * @param nodeId Identifiant unique du nœud (ex: "J1", "J2")
+     * @param host   Adresse IP du nœud (ex: "localhost", "192.168.1.10")
      * @param port   Port d'écoute du serveur (ex: 5001)
      */
-    public P2PNode(String nodeId, int port) {
+    public P2PNode(String nodeId, String host, int port) {
         this.nodeId = nodeId;
+        this.host = host;
         this.port = port;
+        // Ajouter ce nœud à la liste des pairs connus
+        knownPeers.put(nodeId, new PeerInfo(nodeId, host, port));
     }
 
     /**
@@ -65,7 +75,8 @@ public class P2PNode {
      * Accepter les connexions entrantes des autres pairs
      *
      * Écoute continuellement le port et crée une nouvelle connexion
-     * pour chaque pair qui se connecte.
+     * pour chaque pair qui se connecte. Envoie immédiatement la liste
+     * des pairs connus au nouveau connecté pour établir le maillage complet.
      */
     private void acceptIncomingConnections() {
         try {
@@ -76,6 +87,9 @@ public class P2PNode {
                 GestionConnection peerConnection = new GestionConnection(peerSocket, this);
                 connectedPeers.add(peerConnection);
                 executor.execute(peerConnection);
+
+                // IMPORTANT : Envoyer la liste des pairs connus au nouveau connecté
+                sendPeerListTo(peerConnection);
             }
         } catch (IOException e) {
             if (!serverSocket.isClosed()) {
@@ -92,6 +106,20 @@ public class P2PNode {
      * @param remotePort   Port du nœud distant (ex: 5001)
      */
     public void connectToNode(String remoteNodeId, String host, int remotePort) {
+        // Vérifier si on n'est pas déjà connecté à ce pair
+        if (knownPeers.containsKey(remoteNodeId) && remoteNodeId.equals(nodeId)) {
+            System.out.println("[" + nodeId + "] Tentative de connexion à soi-même ignorée");
+            return;
+        }
+
+        // Vérifier si on est déjà connecté à ce pair
+        for (GestionConnection peer : connectedPeers) {
+            if (remoteNodeId.equals(peer.getRemotePeerId())) {
+                System.out.println("[" + nodeId + "] Déjà connecté à " + remoteNodeId);
+                return;
+            }
+        }
+
         executor.execute(() -> {
             try {
                 Socket socket = new Socket(host, remotePort);
@@ -100,9 +128,17 @@ public class P2PNode {
                 GestionConnection peerConnection = new GestionConnection(socket, this);
                 peerConnection.setRemotePeerId(remoteNodeId);
                 connectedPeers.add(peerConnection);
+
+                // Enregistrer ce pair dans la liste des pairs connus
+                PeerInfo peerInfo = new PeerInfo(remoteNodeId, host, remotePort);
+                knownPeers.put(remoteNodeId, peerInfo);
+
                 executor.execute(peerConnection);
+
+                // Annoncer ce nouveau pair à tous les autres pairs connectés
+                broadcastNewPeer(peerInfo);
             } catch (IOException e) {
-                System.err.println("[" + nodeId + "] Erreur: " + e.getMessage());
+                System.err.println("[" + nodeId + "] Erreur connexion à " + remoteNodeId + ": " + e.getMessage());
             }
         });
     }
@@ -118,7 +154,7 @@ public class P2PNode {
         posY = y;
         playerPositions.put(nodeId, new int[]{posX, posY});
 
-        broadcastToPeers(nodeId + ":" + x + "," + y);
+        broadcastToPeers("MOVE:" + nodeId + ":" + x + "," + y);
         System.out.println("[" + nodeId + "] Position: (" + x + ", " + y + ")");
     }
 
@@ -136,69 +172,192 @@ public class P2PNode {
     /**
      * Traiter un message reçu d'un pair
      *
-     * Extrait les coordonnées du message et met à jour la position du joueur.
-     * Le message est ensuite relayé aux autres pairs.
-     *
-     * Format attendu : "NomJoueur:X,Y"
-     * Exemple : "J2:150,250"
+     * Gère différents types de messages :
+     * - MOVE:NomJoueur:X,Y - Mise à jour de position
+     * - PEER_LIST:peer1@host1:port1;peer2@host2:port2 - Liste des pairs
+     * - NEW_PEER:peerX@host:port - Annonce d'un nouveau pair
      *
      * @param message Message reçu
      * @param sender  Connexion qui a envoyé le message
      */
     public void processMessageFromPeer(String message, GestionConnection sender) {
-        // Ignorer les messages null ou vides
         if (message == null || message.trim().isEmpty()) {
             return;
         }
 
         try {
-            String[] parts = message.split(":");
-
-            // Vérifier que le message a le bon format "playerId:coords"
-            if (parts.length != 2) {
-                return; // Message mal formé, ignorer silencieusement
+            // Déterminer le type de message
+            if (message.startsWith("MOVE:")) {
+                processMoveMessage(message, sender);
+            } else if (message.startsWith("PEER_LIST:")) {
+                processPeerListMessage(message);
+            } else if (message.startsWith("NEW_PEER:")) {
+                processNewPeerMessage(message);
+            } else {
+                // Format ancien pour compatibilité : "NomJoueur:X,Y"
+                processLegacyMoveMessage(message, sender);
             }
+        } catch (Exception e) {
+            System.err.println("[" + nodeId + "] Erreur parsing message: " + message);
+        }
+    }
+
+    /**
+     * Traiter un message de type MOVE:playerId:x,y
+     */
+    private void processMoveMessage(String message, GestionConnection sender) {
+        try {
+            // Format: "MOVE:J1:100,200"
+            String content = message.substring(5); // Enlever "MOVE:"
+            String[] parts = content.split(":");
+            if (parts.length != 2) return;
 
             String playerId = parts[0];
-            String coordsStr = parts[1];
-
-            // Vérifier que le playerId n'est pas vide
-            if (playerId == null || playerId.trim().isEmpty()) {
-                return; // Pas de nom de joueur, ignorer
-            }
-
-            // Vérifier que les coordonnées sont présentes
-            if (coordsStr == null || coordsStr.trim().isEmpty()) {
-                return; // Pas de coordonnées, ignorer
-            }
-
-            String[] coords = coordsStr.split(",");
-
-            // Vérifier qu'on a exactement 2 coordonnées
-            if (coords.length != 2) {
-                return; // Format de coordonnées invalide
-            }
-
-            // Vérifier que les coordonnées ne sont pas vides
-            if (coords[0].trim().isEmpty() || coords[1].trim().isEmpty()) {
-                return; // Coordonnées vides
-            }
+            String[] coords = parts[1].split(",");
+            if (coords.length != 2) return;
 
             int x = Integer.parseInt(coords[0].trim());
             int y = Integer.parseInt(coords[1].trim());
+
             playerPositions.put(playerId, new int[]{x, y});
             System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
 
+            // Relayer aux autres pairs
             for (GestionConnection peer : connectedPeers) {
                 if (peer != sender) {
                     peer.sendMessage(message);
                 }
             }
         } catch (NumberFormatException e) {
-            // Coordonnées non numériques, ignorer silencieusement
-        } catch (Exception e) {
-            System.err.println("[" + nodeId + "] Erreur parsing message: " + message);
+            // Ignorer
         }
+    }
+
+    /**
+     * Traiter un message de type PEER_LIST:peer1@host1:port1;peer2@host2:port2
+     */
+    private void processPeerListMessage(String message) {
+        try {
+            // Format: "PEER_LIST:J1@localhost:5001;J2@localhost:5002"
+            String content = message.substring(10); // Enlever "PEER_LIST:"
+            if (content.isEmpty()) return;
+
+            String[] peerStrings = content.split(";");
+            for (String peerString : peerStrings) {
+                PeerInfo peerInfo = PeerInfo.fromString(peerString.trim());
+                if (peerInfo == null) continue;
+
+                // Ne pas se connecter à soi-même
+                if (peerInfo.getPeerId().equals(nodeId)) continue;
+
+                // Ne pas se connecter si déjà connu
+                if (knownPeers.containsKey(peerInfo.getPeerId())) {
+                    System.out.println("[" + nodeId + "] Pair déjà connu: " + peerInfo.getPeerId());
+                    continue;
+                }
+
+                System.out.println("[" + nodeId + "] Nouveau pair découvert via liste: " + peerInfo);
+                knownPeers.put(peerInfo.getPeerId(), peerInfo);
+
+                // Se connecter au nouveau pair
+                connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
+            }
+        } catch (Exception e) {
+            System.err.println("[" + nodeId + "] Erreur traitement PEER_LIST: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Traiter un message de type NEW_PEER:peerX@host:port
+     */
+    private void processNewPeerMessage(String message) {
+        try {
+            // Format: "NEW_PEER:J3@localhost:5003"
+            String content = message.substring(9); // Enlever "NEW_PEER:"
+            PeerInfo peerInfo = PeerInfo.fromString(content.trim());
+            if (peerInfo == null) return;
+
+            // Ne pas se connecter à soi-même
+            if (peerInfo.getPeerId().equals(nodeId)) return;
+
+            // Ne pas se connecter si déjà connu
+            if (knownPeers.containsKey(peerInfo.getPeerId())) {
+                return;
+            }
+
+            System.out.println("[" + nodeId + "] Nouveau pair annoncé: " + peerInfo);
+            knownPeers.put(peerInfo.getPeerId(), peerInfo);
+
+            // Se connecter au nouveau pair
+            connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
+        } catch (Exception e) {
+            System.err.println("[" + nodeId + "] Erreur traitement NEW_PEER: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Traiter un message au format ancien (compatibilité) : "playerId:x,y"
+     */
+    private void processLegacyMoveMessage(String message, GestionConnection sender) {
+        try {
+            String[] parts = message.split(":");
+            if (parts.length != 2) return;
+
+            String playerId = parts[0];
+            String[] coords = parts[1].split(",");
+            if (coords.length != 2) return;
+
+            int x = Integer.parseInt(coords[0].trim());
+            int y = Integer.parseInt(coords[1].trim());
+
+            playerPositions.put(playerId, new int[]{x, y});
+            System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
+
+            // Relayer aux autres pairs
+            for (GestionConnection peer : connectedPeers) {
+                if (peer != sender) {
+                    peer.sendMessage(message);
+                }
+            }
+        } catch (NumberFormatException e) {
+            // Ignorer
+        }
+    }
+
+    /**
+     * Envoyer la liste des pairs connus à une connexion spécifique
+     *
+     * @param connection Connexion à laquelle envoyer la liste
+     */
+    private void sendPeerListTo(GestionConnection connection) {
+        if (knownPeers.isEmpty()) {
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("PEER_LIST:");
+        boolean first = true;
+        for (PeerInfo peerInfo : knownPeers.values()) {
+            if (!first) {
+                sb.append(";");
+            }
+            sb.append(peerInfo.toString());
+            first = false;
+        }
+
+        String message = sb.toString();
+        connection.sendMessage(message);
+        System.out.println("[" + nodeId + "] Liste des pairs envoyée: " + message);
+    }
+
+    /**
+     * Annoncer un nouveau pair à tous les pairs connectés
+     *
+     * @param peerInfo Informations du nouveau pair
+     */
+    private void broadcastNewPeer(PeerInfo peerInfo) {
+        String message = "NEW_PEER:" + peerInfo.toString();
+        broadcastToPeers(message);
+        System.out.println("[" + nodeId + "] Nouveau pair annoncé au réseau: " + peerInfo);
     }
 
     /**
@@ -226,12 +385,17 @@ public class P2PNode {
      * Affiche :
      * - La position du nœud local
      * - Le nombre de pairs connectés
+     * - La liste des pairs connus
      * - Les positions de tous les joueurs connus
      */
     public void printStatus() {
         System.out.println("\n===== État du nœud " + nodeId + " =====");
         System.out.println("Position: (" + posX + ", " + posY + ")");
         System.out.println("Pairs connectés: " + connectedPeers.size());
+        System.out.println("Pairs connus: " + knownPeers.size());
+        for (PeerInfo peerInfo : knownPeers.values()) {
+            System.out.println("  - " + peerInfo);
+        }
         System.out.println("Positions des joueurs:");
         for (Map.Entry<String, int[]> entry : playerPositions.entrySet()) {
             int[] pos = entry.getValue();
