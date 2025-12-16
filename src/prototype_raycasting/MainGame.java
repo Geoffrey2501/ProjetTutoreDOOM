@@ -25,6 +25,9 @@ public class MainGame implements Runnable {
 
         raycasting = new Raycasting(map, joueur);
 
+        // Ajouter quelques sprites de test (monstres/ennemis)
+        raycasting.addSprite(new Sprite(1.5, 1.5, "src/prototype_raycasting/sprites/jonesy.png"));  // Sprite rouge par défaut
+
         raycasting.addKeyListener(input);
         raycasting.addMouseListener(input);
         raycasting.addMouseMotionListener(input);

@@ -5,6 +5,9 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Raycasting extends JFrame {
 
@@ -14,6 +17,9 @@ public class Raycasting extends JFrame {
     private Joueur joueur;
     private int FOV = 60;
     private int NUM_RAYS = 1000; //"definition" de la qualite du rendu
+
+    private List<Sprite> sprites = new ArrayList<>();
+    private double[] zBuffer; // Pour stocker les distances des murs
 
     public Raycasting(Map m, Joueur j) {
         //le titre de la fenetre
@@ -51,6 +57,14 @@ public class Raycasting extends JFrame {
         setVisible(true);
     }
 
+    public void addSprite(Sprite sprite) {
+        sprites.add(sprite);
+    }
+
+    public void removeSprite(Sprite sprite) {
+        sprites.remove(sprite);
+    }
+
     //methode qui effectue le dessin
     private void dessiner(Graphics g) {
         //on code le raycasting ici
@@ -66,6 +80,9 @@ public class Raycasting extends JFrame {
 
         int screenWidth = panelDessin.getWidth();
         int screenHeight = panelDessin.getHeight();
+
+        // Initialiser le z-buffer
+        zBuffer = new double[screenWidth];
 
         //dessiner le ciel et le sol
         g.setColor(new Color(135, 206, 235)); // Bleu ciel
@@ -177,6 +194,93 @@ public class Raycasting extends JFrame {
 
             g.setColor(wallColor);
             g.fillRect(x1, drawStart, rayWidth, drawEnd - drawStart + 1);
+
+            //remplir le z-buffer pour chaque pixel de cette colonne
+            for (int x = x1; x < x2 && x < screenWidth; x++) {
+                zBuffer[x] = perpWallDist;
+            }
+        }
+
+        // Dessiner les sprites
+        dessinerSprites(g, screenWidth, screenHeight, joueurX, joueurY, joueurAngle, fov);
+    }
+
+    private void dessinerSprites(Graphics g, int screenWidth, int screenHeight,
+                                  double joueurX, double joueurY, double joueurAngle, double fov) {
+
+        //trier les sprites par distance (du plus loin au plus proche)
+        List<Sprite> sortedSprites = new ArrayList<>(sprites);
+        sortedSprites.sort((a, b) -> {
+            double distA = (a.getX() - joueurX) * (a.getX() - joueurX) + (a.getY() - joueurY) * (a.getY() - joueurY);
+            double distB = (b.getX() - joueurX) * (b.getX() - joueurX) + (b.getY() - joueurY) * (b.getY() - joueurY);
+            return Double.compare(distB, distA);
+        });
+
+        Graphics2D g2d = (Graphics2D) g;
+
+        for (Sprite sprite : sortedSprites) {
+            //position relative du sprite par rapport au joueur
+            double spriteX = sprite.getX() - joueurX;
+            double spriteY = sprite.getY() - joueurY;
+
+            //calculer l'angle vers le sprite
+            double spriteAngle = Math.atan2(spriteY, spriteX);
+            double angleDiff = spriteAngle - joueurAngle;
+
+            //normaliser l'angle entre -PI et PI
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            //verifier si le sprite est dans le FOV
+            if (Math.abs(angleDiff) > fov / 2 + 0.2) continue;
+
+            //distance au sprite
+            double spriteDistance = Math.sqrt(spriteX * spriteX + spriteY * spriteY);
+            if (spriteDistance < 0.1) continue; // Trop proche
+
+            //position X sur l'ecran
+            int spriteScreenX = (int) ((0.5 + angleDiff / fov) * screenWidth);
+
+            //taille du sprite à l'ecran
+            int spriteHeight = (int) (screenHeight / spriteDistance);
+            int spriteWidth = spriteHeight; // Sprite carré
+
+            int drawStartY = screenHeight / 2 - spriteHeight / 2;
+            int drawStartX = spriteScreenX - spriteWidth / 2;
+            int drawEndX = spriteScreenX + spriteWidth / 2;
+
+            //verifier si au moins une partie du sprite est visible (devant les murs)
+            boolean visible = false;
+            for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
+                if (spriteDistance < zBuffer[stripe]) {
+                    visible = true;
+                    break;
+                }
+            }
+            if (!visible) continue;
+
+            //dessiner le sprite avec clipping par colonne
+            //on dessine colonne par colonne mais avec drawImage (beaucoup plus rapide)
+            BufferedImage spriteImage = sprite.getImage();
+            int imgWidth = spriteImage.getWidth();
+            int imgHeight = spriteImage.getHeight();
+
+            for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
+                //verifier le z-buffer
+                if (spriteDistance < zBuffer[stripe]) {
+                    //calculer quelle colonne de texture dessiner
+                    int texX = (stripe - drawStartX) * imgWidth / spriteWidth;
+                    if (texX < 0 || texX >= imgWidth) continue;
+
+                    //dessiner cette colonne du sprite
+                    g2d.drawImage(spriteImage,
+                            stripe, drawStartY,           //destination top-left
+                            stripe + 1, drawStartY + spriteHeight, //destination bottom-right
+                            texX, 0,                      //source top-left
+                            texX + 1, imgHeight,          //source bottom-right
+                            null);
+                }
+            }
         }
     }
 
