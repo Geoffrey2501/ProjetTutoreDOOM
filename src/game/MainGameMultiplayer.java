@@ -20,7 +20,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private Robot robot;
 
     private GameNetworkAdapter network;
-    private Map<String, Sprite> playerSprites;
+    private final Map<String, Sprite> playerSprites;
 
     private boolean running;
     private final int FPS = 60;
@@ -29,11 +29,19 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private static final String PLAYER_SPRITE_PATH = "src/prototype_raycasting/sprites/jonesy.png";
 
 
+    private boolean mouseCaptured = true;
+    private boolean escapePressed = false;
+    private Cursor blankCursor;
+    private Cursor defaultCursor;
+
+    private final Point centerPoint;
+
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
         map = new prototype_raycasting.Map("src/prototype_raycasting/map/map.txt");
         joueur = new Joueur(playerId, 2.0, 2.0, 0.0);
         input = new Input();
         playerSprites = new ConcurrentHashMap<>();
+        centerPoint = new Point();
 
         raycasting = new Raycasting(map, joueur);
         raycasting.addKeyListener(input);
@@ -52,8 +60,9 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             e.printStackTrace();
         }
         BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-        Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
+        blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
                 cursorImg, new Point(0, 0), "blank cursor");
+        defaultCursor = Cursor.getDefaultCursor();
         raycasting.getContentPane().setCursor(blankCursor);
 
         network = new GameNetworkAdapter(playerId, "localhost", port);
@@ -93,6 +102,12 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     }
 
     private void update(double delta) {
+        handleMouseCaptureState();
+
+        double angle = joueur.getAngle();
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+
         double moveSpeed = 1.5 * delta;
         double rotSpeed = 2.0 * delta;
 
@@ -101,64 +116,78 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         boolean moved = false;
 
         if (input.forward) {
-            dx += Math.cos(joueur.getAngle()) * moveSpeed;
-            dy += Math.sin(joueur.getAngle()) * moveSpeed;
-            moved = true;
+            dx += cos;
+            dy += sin;
         }
         if (input.backward) {
-            dx -= Math.cos(joueur.getAngle()) * moveSpeed;
-            dy -= Math.sin(joueur.getAngle()) * moveSpeed;
-            moved = true;
+            dx -= cos;
+            dy -= sin;
         }
         if (input.strafeLeft) {
-            dx += Math.sin(joueur.getAngle()) * moveSpeed;
-            dy -= Math.cos(joueur.getAngle()) * moveSpeed;
-            moved = true;
+            dx += sin;
+            dy -= cos;
         }
         if (input.strafeRight) {
-            dx -= Math.sin(joueur.getAngle()) * moveSpeed;
-            dy += Math.cos(joueur.getAngle()) * moveSpeed;
-            moved = true;
+            dx -= sin;
+            dy += cos;
         }
 
-        if (!map.isWall((int)(joueur.getX() + dx), (int)joueur.getY())) {
-            joueur.setX(joueur.getX() + dx);
-        }
-        if (!map.isWall((int)joueur.getX(), (int)(joueur.getY() + dy))) {
-            joueur.setY(joueur.getY() + dy);
+        if (dx != 0 || dy != 0) {
+            dx *= moveSpeed;
+            dy *= moveSpeed;
+
+            double nextX = joueur.getX() + dx;
+            double nextY = joueur.getY() + dy;
+
+            if (!map.isWall((int) nextX, (int) joueur.getY())) {
+                joueur.setX(nextX);
+                moved = true;
+            }
+
+            if (!map.isWall((int) joueur.getX(), (int) nextY)) {
+                joueur.setY(nextY);
+                moved = true;
+            }
         }
 
         if (input.turnLeft) {
-            joueur.setAngle(joueur.getAngle() - rotSpeed);
+            joueur.setAngle(angle - rotSpeed);
             moved = true;
-        }
-        if (input.turnRight) {
-            joueur.setAngle(joueur.getAngle() + rotSpeed);
+        } else if (input.turnRight) {
+            joueur.setAngle(angle + rotSpeed);
             moved = true;
         }
 
-        if (raycasting.isShowing()) {
-            int centerX = raycasting.getWidth() / 2;
-            int centerY = raycasting.getHeight() / 2;
-            int currentMouseX = input.mouseX;
-            int deltaX = currentMouseX - centerX;
+        if (mouseCaptured && raycasting.isShowing()) {
+            int width = raycasting.getWidth();
+            int height = raycasting.getHeight();
+            int centerX = width / 2;
+            int centerY = height / 2;
+
+            int deltaX = input.mouseX - centerX;
 
             if (deltaX != 0) {
                 joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
                 moved = true;
 
-                Point centerScreen = new Point(centerX, centerY);
-                SwingUtilities.convertPointToScreen(centerScreen, raycasting);
-                robot.mouseMove(centerScreen.x, centerScreen.y);
+                centerPoint.setLocation(centerX, centerY);
+                SwingUtilities.convertPointToScreen(centerPoint, raycasting);
+                robot.mouseMove(centerPoint.x, centerPoint.y);
+
                 input.mouseX = centerX;
                 input.mouseY = centerY;
             }
         }
 
-        // Envoyer la position à chaque frame si le joueur a bougé
-        // Le tick rate dans GestionConnection (16ms) optimisera l'envoi automatiquement
-        if (moved) {
+        long now = System.currentTimeMillis();
+
+        if (moved && (now - lastPositionSendTime >= POSITION_SEND_INTERVAL_MS)) {
             network.sendPlayerPosition();
+            lastPositionSendTime = now;
+            lastPeriodicSendTime = now;
+        }else if(now - lastPeriodicSendTime >= PERIODIC_SEND_INTERVAL_MS) {
+            network.sendPlayerPositionNow();
+            lastPeriodicSendTime = now;
         }
 
         // Gestion du scoreboard (touche Tab)
@@ -169,6 +198,42 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         }
 
         updateRemotePlayerSprites();
+    }
+
+    private void handleMouseCaptureState() {
+        if (input.escape) {
+            if (!escapePressed) {
+                escapePressed = true;
+                toggleMouseCapture(!mouseCaptured);
+            }
+        } else {
+            escapePressed = false;
+        }
+
+        if (!mouseCaptured && input.mouseLeftClicked) {
+            toggleMouseCapture(true);
+            input.mouseLeftClicked = false;
+        }
+    }
+
+    private void toggleMouseCapture(boolean capture) {
+        mouseCaptured = capture;
+        if (mouseCaptured) {
+            raycasting.getContentPane().setCursor(blankCursor);
+            recenterMouse();
+        } else {
+            raycasting.getContentPane().setCursor(defaultCursor);
+        }
+    }
+
+    private void recenterMouse() {
+        if (raycasting.isShowing()) {
+            centerPoint.setLocation(raycasting.getWidth() / 2, raycasting.getHeight() / 2);
+            SwingUtilities.convertPointToScreen(centerPoint, raycasting);
+            robot.mouseMove(centerPoint.x, centerPoint.y);
+            input.mouseX = raycasting.getWidth() / 2;
+            input.mouseY = raycasting.getHeight() / 2;
+        }
     }
 
     private void updateRemotePlayerSprites() {
