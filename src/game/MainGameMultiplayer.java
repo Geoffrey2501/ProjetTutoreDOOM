@@ -244,41 +244,50 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
-        // Si le sprite n'existe pas encore et la position est valide, le créer maintenant
-        if (!playerSprites.containsKey(playerId) && x > -999 && y > -999) {
-            Joueur remotePlayer = network.getRemotePlayer(playerId);
-            if (remotePlayer != null) {
-                Sprite playerSprite = new Sprite(x, y, PLAYER_SPRITE_PATH, playerId);
-                playerSprites.put(playerId, playerSprite);
-                raycasting.addSprite(playerSprite);
+        // Si le sprite n'existe pas encore, le créer maintenant
+        synchronized (playerSprites) {
+            if (!playerSprites.containsKey(playerId)) {
+                Joueur remotePlayer = network.getRemotePlayer(playerId);
+                if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
+                    Sprite playerSprite = new Sprite(x, y, PLAYER_SPRITE_PATH, playerId);
+                    playerSprites.put(playerId, playerSprite);
+                    raycasting.addSprite(playerSprite);
+                }
             }
         }
     }
 
     @Override
     public void onPlayerJoin(String playerId) {
-        // Éviter les doublons
-        if (playerSprites.containsKey(playerId)) {
-            return;
-        }
+        // Éviter les doublons avec synchronisation
+        synchronized (playerSprites) {
+            if (playerSprites.containsKey(playerId)) {
+                return;
+            }
 
-        Joueur remotePlayer = network.getRemotePlayer(playerId);
-        if (remotePlayer != null) {
-            // Ne créer le sprite que si la position est valide (pas la position temporaire)
-            if (remotePlayer.getX() > -999 && remotePlayer.getY() > -999) {
-                Sprite playerSprite = new Sprite(remotePlayer.getX(), remotePlayer.getY(), PLAYER_SPRITE_PATH, playerId);
+            Joueur remotePlayer = network.getRemotePlayer(playerId);
+            if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
+                Sprite playerSprite = new Sprite(
+                    remotePlayer.getX(),
+                    remotePlayer.getY(),
+                    PLAYER_SPRITE_PATH,
+                    playerId
+                );
                 playerSprites.put(playerId, playerSprite);
                 raycasting.addSprite(playerSprite);
             }
-            raycasting.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         }
 
+        raycasting.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         network.sendPlayerPositionNow();
     }
 
     @Override
     public void onPlayerLeave(String playerId) {
-        Sprite sprite = playerSprites.remove(playerId);
+        Sprite sprite;
+        synchronized (playerSprites) {
+            sprite = playerSprites.remove(playerId);
+        }
         if (sprite != null) {
             raycasting.removeSprite(sprite);
             raycasting.addLogMessage(playerId + " a quitté la partie", Color.RED);
