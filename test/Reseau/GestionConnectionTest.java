@@ -29,7 +29,7 @@ public class GestionConnectionTest {
     @BeforeEach
     void setUp() throws IOException, InterruptedException {
         testPort += 10;
-        mockNode = new Serveur("MockNode", testPort + 100);
+        mockNode = new Serveur("MockNode", "localhost", testPort + 100);
         mockNode.start();
 
         // Créer un serveur temporaire pour les tests
@@ -58,6 +58,7 @@ public class GestionConnectionTest {
 
         assertTrue(connectionLatch.await(3, TimeUnit.SECONDS), "La connexion doit être établie");
     }
+
 
     @AfterEach
     void tearDown() {
