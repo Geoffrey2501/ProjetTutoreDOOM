@@ -468,13 +468,6 @@ public class Raycasting extends JFrame {
             y += rowHeight;
             index++;
         }
-
-        // Message d'aide en bas
-        g2d.setFont(new Font("Arial", Font.ITALIC, 12));
-        g2d.setColor(new Color(150, 150, 150));
-        String helpText = "Appuyez sur TAB pour fermer";
-        int helpWidth = g2d.getFontMetrics().stringWidth(helpText);
-        g2d.drawString(helpText, tableX + (tableWidth - helpWidth) / 2, tableY + tableHeight - 8);
     }
 
     //une methode qui permet de rendre une image avec un objet Map et un objet Joueur
