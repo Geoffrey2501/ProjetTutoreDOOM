@@ -26,17 +26,28 @@ public class P2PClient {
 
         System.out.print("Port du client (ex: 5002) : ");
         int clientPort = scanner.nextInt();
+        scanner.nextLine(); // Consommer le retour à la ligne
+
+        System.out.print("Adresse IP du serveur (ex: 192.168.1.10 ou localhost) : ");
+        String serverIp = scanner.nextLine().trim();
+        if (serverIp.isEmpty()) {
+            serverIp = "localhost";
+        }
+
+        System.out.print("Port du serveur (ex: 5001) : ");
+        int serverPort = scanner.nextInt();
+        scanner.nextLine(); // Consommer le retour à la ligne
 
         // Créer le nœud client
-        Serveur clientNode = new Serveur(playerName, "localhost", clientPort);
+        Serveur clientNode = new Serveur(playerName, "0.0.0.0", clientPort);
         clientNode.start();
         Thread.sleep(1000);
 
         System.out.println("\nClient démarré sur le port " + clientPort);
 
         // Se connecter au serveur
-        System.out.println("Connexion au serveur sur localhost:5001...\n");
-        clientNode.connectToNode("Serveur", "localhost", 5001);
+        System.out.println("Connexion au serveur sur " + serverIp + ":" + serverPort + "...\n");
+        clientNode.connectToNode("Serveur", serverIp, serverPort);
         Thread.sleep(2000);
 
         // Afficher l'état
