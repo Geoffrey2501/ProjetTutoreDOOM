@@ -107,28 +107,65 @@ public class GestionConnectionTest {
     // ==================== Tests de sendMessage ====================
 
     @Test
-    @DisplayName("Test envoi de message")
+    @DisplayName("Test envoi de message non-MOVE (immédiat)")
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void testSendMessage() throws IOException {
-        String testMessage = "J1:100,200";
+        String testMessage = "PEER_LIST:J1,J2";
 
         gestionConnection.sendMessage(testMessage);
 
         String received = clientIn.readLine();
-        assertEquals(testMessage, received, "Le message doit être reçu correctement");
+        assertEquals(testMessage, received, "Le message non-MOVE doit être reçu immédiatement");
     }
 
     @Test
-    @DisplayName("Test envoi de plusieurs messages")
+    @DisplayName("Test envoi de message MOVE avec tick rate")
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void testSendMoveMessage() throws IOException, InterruptedException {
+        String testMessage = "MOVE:J1:100,200";
+
+        gestionConnection.sendMessage(testMessage);
+
+        // Attendre le prochain tick (50ms max)
+        Thread.sleep(100);
+
+        String received = clientIn.readLine();
+        assertEquals(testMessage, received, "Le message MOVE doit être reçu au prochain tick");
+    }
+
+    @Test
+    @DisplayName("Test plusieurs messages MOVE rapides - seul le dernier est envoyé")
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void testMultipleMoveMessagesOnlyLastSent() throws IOException, InterruptedException {
+        // Envoyer plusieurs messages MOVE rapidement
+        gestionConnection.sendMessage("MOVE:J1:100,200");
+        gestionConnection.sendMessage("MOVE:J1:150,250");
+        gestionConnection.sendMessage("MOVE:J1:200,300");
+
+        // Attendre le prochain tick
+        Thread.sleep(100);
+
+        // Seul le dernier message doit être reçu
+        String received = clientIn.readLine();
+        assertEquals("MOVE:J1:200,300", received, "Seul le dernier message MOVE doit être envoyé");
+
+        // Vérifier qu'il n'y a pas d'autres messages en attente (avec timeout court)
+        clientSocket.setSoTimeout(200);
+        assertThrows(SocketTimeoutException.class, () -> clientIn.readLine(),
+                "Aucun autre message ne doit être en attente");
+    }
+
+    @Test
+    @DisplayName("Test envoi de plusieurs messages non-MOVE")
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void testSendMultipleMessages() throws IOException {
-        gestionConnection.sendMessage("J1:50,75");
-        gestionConnection.sendMessage("J2:100,150");
-        gestionConnection.sendMessage("J3:200,250");
+        gestionConnection.sendMessage("CONNECT:J1");
+        gestionConnection.sendMessage("CONNECT:J2");
+        gestionConnection.sendMessage("CONNECT:J3");
 
-        assertEquals("J1:50,75", clientIn.readLine());
-        assertEquals("J2:100,150", clientIn.readLine());
-        assertEquals("J3:200,250", clientIn.readLine());
+        assertEquals("CONNECT:J1", clientIn.readLine());
+        assertEquals("CONNECT:J2", clientIn.readLine());
+        assertEquals("CONNECT:J3", clientIn.readLine());
     }
 
     @Test
