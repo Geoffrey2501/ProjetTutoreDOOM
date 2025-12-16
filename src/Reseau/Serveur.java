@@ -166,6 +166,10 @@ public class Serveur {
 
                 executor.execute(peerConnection);
 
+                // IMPORTANT : Envoyer la liste des pairs connus au nouveau connecté
+                // pour établir le maillage complet
+                sendPeerListTo(peerConnection);
+
                 // Annoncer ce nouveau pair à tous les autres pairs connectés
                 broadcastNewPeer(peerInfo);
             } catch (IOException e) {
@@ -246,6 +250,20 @@ public class Serveur {
             //mettre à jour le peerId du sender si pas encore fait
             if (sender.getRemotePeerId() == null) {
                 sender.setRemotePeerId(playerId);
+
+                // Ajouter ce pair à la liste des pairs connus
+                try {
+                    String peerHost = ((InetSocketAddress) sender.getRemoteAddress()).getAddress().getHostAddress();
+                    int peerPort = ((InetSocketAddress) sender.getRemoteAddress()).getPort();
+                    PeerInfo peerInfo = new PeerInfo(playerId, peerHost, peerPort);
+                    knownPeers.put(playerId, peerInfo);
+                } catch (Exception e) {
+                    // Ignorer si on ne peut pas obtenir l'adresse
+                }
+
+                // Envoyer la liste des pairs connus pour établir le maillage complet
+                sendPeerListTo(sender);
+
                 onPeerConnected(playerId);
             }
 

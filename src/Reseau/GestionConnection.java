@@ -140,4 +140,13 @@ public class GestionConnection implements Runnable {
     public String getRemotePeerId() {
         return remotePeerId;
     }
+
+    /**
+     * Obtenir l'adresse distante du socket
+     *
+     * @return SocketAddress du pair distant
+     */
+    public SocketAddress getRemoteAddress() {
+        return socket.getRemoteSocketAddress();
+    }
 }

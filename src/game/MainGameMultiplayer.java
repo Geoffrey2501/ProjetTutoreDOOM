@@ -5,10 +5,10 @@ import prototype_raycasting.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MainGameMultiplayer implements Runnable, NetworkListener {
@@ -20,7 +20,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private Robot robot;
 
     private GameNetworkAdapter network;
-    private final Map<String, Sprite> playerSprites;
+    private final java.util.Map<String, Sprite> playerSprites;
 
     private boolean running;
     private final int FPS = 60;
@@ -230,7 +230,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     }
 
     private void updateRemotePlayerSprites() {
-        for (Map.Entry<String, Joueur> entry : network.getRemotePlayers().entrySet()) {
+        for (java.util.Map.Entry<String, Joueur> entry : network.getRemotePlayers().entrySet()) {
             String playerId = entry.getKey();
             Joueur remotePlayer = entry.getValue();
 
@@ -289,10 +289,39 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         running = false;
     }
 
+    /**
+     * Obtenir l'adresse IP locale de la machine (pas localhost)
+     */
+    private static String getLocalIPAddress() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (!addr.isLoopbackAddress() && addr.isSiteLocalAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignorer
+        }
+        return "localhost";
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.println("=== DOOM-LIKE MULTIJOUEUR ===\n");
+        System.out.println("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
+
+        // Afficher l'IP locale
+        String localIP = getLocalIPAddress();
+        System.out.println("Votre IP locale: " + localIP);
+        System.out.println("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
 
         System.out.print("Votre nom de joueur: ");
         String playerId = scanner.nextLine().trim();
@@ -301,24 +330,35 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         System.out.print("Votre port (ex: 5001): ");
         int port = Integer.parseInt(scanner.nextLine().trim());
 
-        System.out.print("Êtes-vous l'hôte (premier joueur)? (o/n): ");
-        String isHost = scanner.nextLine().trim().toLowerCase();
+        System.out.println("\n=== Mode Peer-to-Peer (Maillage complet) ===");
+        System.out.println("Vous pouvez vous connecter à un ou plusieurs joueurs.");
+        System.out.println("Le réseau se synchronisera automatiquement (tous connectés à tous).\n");
 
-        String serverIp = null;
-        int serverPort = 0;
+        System.out.print("Voulez-vous rejoindre un joueur existant? (o/n): ");
+        String wantToConnect = scanner.nextLine().trim().toLowerCase();
 
-        if (!isHost.equals("o") && !isHost.equals("oui")) {
-            System.out.print("IP du serveur (ex: localhost ou 192.168.1.10): ");
-            serverIp = scanner.nextLine().trim();
+        MainGameMultiplayer game;
 
-            System.out.print("Port du serveur: ");
-            serverPort = Integer.parseInt(scanner.nextLine().trim());
+        if (wantToConnect.equals("o") || wantToConnect.equals("oui")) {
+            System.out.print("IP du pair (ex: localhost ou 192.168.1.10): ");
+            String peerIp = scanner.nextLine().trim();
+
+            System.out.print("Port du pair: ");
+            int peerPort = Integer.parseInt(scanner.nextLine().trim());
+
+            game = new MainGameMultiplayer(playerId, port, peerIp, peerPort);
+            System.out.println("\nConnexion au pair " + peerIp + ":" + peerPort);
+            System.out.println("Le maillage P2P va se former automatiquement...");
+        } else {
+            game = new MainGameMultiplayer(playerId, port, null, 0);
+            System.out.println("\nEn attente de connexions sur le port " + port);
+            System.out.println("Les autres joueurs peuvent se connecter à votre IP:port");
         }
 
         System.out.println("\nDémarrage du jeu...");
-        System.out.println("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder\n");
+        System.out.println("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
+        System.out.println("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
 
-        MainGameMultiplayer game = new MainGameMultiplayer(playerId, port, serverIp, serverPort);
         new Thread(game).start();
     }
 }
