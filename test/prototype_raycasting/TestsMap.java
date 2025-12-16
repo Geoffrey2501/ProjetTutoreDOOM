@@ -1,8 +1,7 @@
-package prototype_raycasting.tests;
+package prototype_raycasting;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import prototype_raycasting.Map;
 
 import java.io.File;
 import java.io.FileWriter;
