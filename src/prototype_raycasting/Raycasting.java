@@ -56,6 +56,19 @@ public class Raycasting extends JFrame {
         return PLAYER_COLORS[colorIndex];
     }
 
+    /**
+     * Tronquer un nom s'il dépasse la longueur maximale
+     */
+    private static final int MAX_NAME_LENGTH = 20;
+
+    private String truncateName(String name) {
+        if (name == null) return "";
+        if (name.length() <= MAX_NAME_LENGTH) {
+            return name;
+        }
+        return name.substring(0, MAX_NAME_LENGTH - 3) + "...";
+    }
+
     private static class LogMessage {
         String text;
         long timestamp;
@@ -368,9 +381,10 @@ public class Raycasting extends JFrame {
             //dessiner le pseudo au dessus du sprite
             String playerName = sprite.getPlayerName();
             if (playerName != null && !playerName.isEmpty()) {
+                String displayName = truncateName(playerName);
                 g2d.setFont(new Font("Arial", Font.BOLD, 16));
                 FontMetrics fm = g2d.getFontMetrics();
-                int textWidth = fm.stringWidth(playerName);
+                int textWidth = fm.stringWidth(displayName);
                 int textX = spriteScreenX - textWidth / 2;
                 int textY = drawStartY - 10;
 
@@ -379,7 +393,7 @@ public class Raycasting extends JFrame {
                 g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight() + 4);
 
                 g2d.setColor(Color.WHITE);
-                g2d.drawString(playerName, textX, textY);
+                g2d.drawString(displayName, textX, textY);
             }
         }
     }
@@ -487,9 +501,9 @@ public class Raycasting extends JFrame {
             g2d.setColor(textColor);
 
             if (isLocal) {
-                g2d.drawString(playerName + " (vous)", tableX + 85, y);
+                g2d.drawString(truncateName(playerName) + " (vous)", tableX + 85, y);
             } else {
-                g2d.drawString(playerName, tableX + 85, y);
+                g2d.drawString(truncateName(playerName), tableX + 85, y);
             }
 
             y += rowHeight;
