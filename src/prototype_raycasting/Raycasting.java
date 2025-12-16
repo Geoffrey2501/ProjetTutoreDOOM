@@ -32,6 +32,30 @@ public class Raycasting extends JFrame {
     private List<String> playerList = new CopyOnWriteArrayList<>();
     private String localPlayerName = "";
 
+    // Palette de couleurs pour les joueurs distants
+    private static final Color[] PLAYER_COLORS = {
+        new Color(0, 150, 255),   // Bleu
+        new Color(255, 100, 100), // Rouge
+        new Color(255, 200, 0),   // Jaune/Or
+        new Color(200, 100, 255), // Violet
+        new Color(255, 150, 50),  // Orange
+        new Color(100, 255, 255), // Cyan
+        new Color(255, 100, 200), // Rose
+        new Color(150, 255, 150), // Vert clair
+    };
+
+    /**
+     * Obtenir la couleur d'un joueur basée sur son nom
+     */
+    private Color getPlayerColor(String playerName) {
+        if (playerName.equals(localPlayerName)) {
+            return new Color(0, 200, 0); // Vert pour le joueur local
+        }
+        // Utiliser le hashcode du nom pour avoir une couleur cohérente
+        int colorIndex = Math.abs(playerName.hashCode()) % PLAYER_COLORS.length;
+        return PLAYER_COLORS[colorIndex];
+    }
+
     private static class LogMessage {
         String text;
         long timestamp;
@@ -443,25 +467,28 @@ public class Raycasting extends JFrame {
         for (String playerName : playerList) {
             // Indicateur pour le joueur local
             boolean isLocal = playerName.equals(localPlayerName);
+            Color playerColor = getPlayerColor(playerName);
 
             // Numéro du joueur
             g2d.setColor(new Color(150, 150, 150));
             g2d.drawString(String.valueOf(index) + ".", tableX + 30, y);
 
             // Icône joueur (petit cercle coloré)
-            if (isLocal) {
-                g2d.setColor(new Color(0, 200, 0)); // Vert pour le joueur local
-            } else {
-                g2d.setColor(new Color(0, 150, 255)); // Bleu pour les autres
-            }
+            g2d.setColor(playerColor);
             g2d.fillOval(tableX + 60, y - 12, 15, 15);
 
             // Nom du joueur
+            // Version plus claire de la couleur pour le texte
+            Color textColor = new Color(
+                Math.min(255, playerColor.getRed() + 55),
+                Math.min(255, playerColor.getGreen() + 55),
+                Math.min(255, playerColor.getBlue() + 55)
+            );
+            g2d.setColor(textColor);
+
             if (isLocal) {
-                g2d.setColor(new Color(100, 255, 100)); // Vert clair pour le local
                 g2d.drawString(playerName + " (vous)", tableX + 85, y);
             } else {
-                g2d.setColor(Color.WHITE);
                 g2d.drawString(playerName, tableX + 85, y);
             }
 
