@@ -32,6 +32,15 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     // Chemin du sprite pour les autres joueurs
     private static final String PLAYER_SPRITE_PATH = "src/prototype_raycasting/sprites/jonesy.png";
 
+    // Optimisation réseau
+    private int frameCounter = 0;
+    private static final int NETWORK_UPDATE_INTERVAL = 3; // Envoyer toutes les 3 frames (20 fps au lieu de 60)
+    private static final int SPRITE_UPDATE_INTERVAL = 2; // Mettre à jour les sprites toutes les 2 frames
+
+    // Cache du centre de l'écran
+    private int cachedCenterX = -1;
+    private int cachedCenterY = -1;
+
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
         // Initialisation de la carte et du joueur
         map = new prototype_raycasting.Map("src/prototype_raycasting/map/map.txt");
@@ -100,6 +109,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     }
 
     private void update(double delta) {
+        frameCounter++;
+
         double moveSpeed = 1.5 * delta;
         double rotSpeed = 2.0 * delta;
 
@@ -129,11 +140,11 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             moved = true;
         }
 
-        // Détection de collision
-        if (!map.isWall((int)(joueur.getX() + dx), (int)joueur.getY())) {
+        // Détection de collision (optimisé)
+        if (dx != 0 && !map.isWall((int)(joueur.getX() + dx), (int)joueur.getY())) {
             joueur.setX(joueur.getX() + dx);
         }
-        if (!map.isWall((int)joueur.getX(), (int)(joueur.getY() + dy))) {
+        if (dy != 0 && !map.isWall((int)joueur.getX(), (int)(joueur.getY() + dy))) {
             joueur.setY(joueur.getY() + dy);
         }
 
@@ -147,36 +158,42 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             moved = true;
         }
 
-        // Rotation souris
+        // Rotation souris (cache le centre pour éviter de le recalculer)
         if (raycasting.isShowing()) {
-            int centerX = raycasting.getWidth() / 2;
-            int centerY = raycasting.getHeight() / 2;
-            int currentMouseX = input.mouseX;
-            int deltaX = currentMouseX - centerX;
+            // Recalculer le centre seulement si nécessaire
+            if (cachedCenterX < 0) {
+                cachedCenterX = raycasting.getWidth() / 2;
+                cachedCenterY = raycasting.getHeight() / 2;
+            }
+
+            int deltaX = input.mouseX - cachedCenterX;
 
             if (deltaX != 0) {
                 joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
                 moved = true;
 
-                Point centerScreen = new Point(centerX, centerY);
+                Point centerScreen = new Point(cachedCenterX, cachedCenterY);
                 SwingUtilities.convertPointToScreen(centerScreen, raycasting);
                 robot.mouseMove(centerScreen.x, centerScreen.y);
-                input.mouseX = centerX;
-                input.mouseY = centerY;
+                input.mouseX = cachedCenterX;
+                input.mouseY = cachedCenterY;
             }
         }
 
-        // Envoyer la position si on a bougé
-        if (moved) {
+        // Envoyer la position seulement toutes les N frames (réduit le trafic réseau)
+        if (moved && (frameCounter % NETWORK_UPDATE_INTERVAL == 0)) {
             network.sendPlayerPosition();
         }
 
-        // Mettre à jour les sprites des autres joueurs
-        updateRemotePlayerSprites();
+        // Mettre à jour les sprites des autres joueurs moins souvent
+        if (frameCounter % SPRITE_UPDATE_INTERVAL == 0) {
+            updateRemotePlayerSprites();
+        }
     }
 
     /**
      * Met à jour les positions des sprites des autres joueurs
+     * Optimisé : met à jour seulement si la position a changé significativement
      */
     private void updateRemotePlayerSprites() {
         for (Map.Entry<String, Joueur> entry : network.getRemotePlayers().entrySet()) {
@@ -185,8 +202,18 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
             Sprite sprite = playerSprites.get(playerId);
             if (sprite != null) {
-                sprite.setX(remotePlayer.getX());
-                sprite.setY(remotePlayer.getY());
+                double newX = remotePlayer.getX();
+                double newY = remotePlayer.getY();
+
+                // Mettre à jour seulement si la position a changé de plus de 0.01
+                // (évite les mises à jour inutiles pour des micro-mouvements)
+                double dx = Math.abs(sprite.getX() - newX);
+                double dy = Math.abs(sprite.getY() - newY);
+
+                if (dx > 0.01 || dy > 0.01) {
+                    sprite.setX(newX);
+                    sprite.setY(newY);
+                }
             }
         }
     }

@@ -1,4 +1,3 @@
-import com.sun.tools.javac.Main;
 import prototype_raycasting.Map;
 
 public class Lancer {
