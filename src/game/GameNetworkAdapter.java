@@ -5,6 +5,7 @@ import Reseau.Serveur;
 import prototype_raycasting.Joueur;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GameNetworkAdapter {
@@ -12,12 +13,14 @@ public class GameNetworkAdapter {
     private ServeurGame serveur;
     private Joueur localPlayer;
     private Map<String, Joueur> remotePlayers;
+    private Set<String> notifiedPlayers; // Pour éviter les notifications en double
     private NetworkListener listener;
 
 
     public GameNetworkAdapter(String nodeId, String host, int port) {
         this.serveur = new ServeurGame(nodeId, host, port, this);
         this.remotePlayers = new ConcurrentHashMap<>();
+        this.notifiedPlayers = ConcurrentHashMap.newKeySet();
     }
 
     public void setLocalPlayer(Joueur player) {
@@ -61,23 +64,33 @@ public class GameNetworkAdapter {
         }
 
         boolean isNewPlayer = false;
-        Joueur remotePlayer = remotePlayers.get(playerId);
+        Joueur remotePlayer;
 
-        if (remotePlayer == null) {
-            //créer le joueur avec des coordonnées temporaires
-            remotePlayer = new Joueur(playerId, -1000, -1000, 0);
-            //parser immédiatement les vraies coordonnées
-            if (!remotePlayer.fromNetworkString(positionData)) {
-                //si le parsing échoue, ne pas ajouter ce joueur
-                return;
+        // Synchroniser pour éviter la création de doublons
+        synchronized (remotePlayers) {
+            remotePlayer = remotePlayers.get(playerId);
+
+            if (remotePlayer == null) {
+                // Créer le joueur sans position (non initialisé)
+                remotePlayer = new Joueur(playerId);
+                // Parser les coordonnées
+                if (!remotePlayer.fromNetworkString(positionData)) {
+                    // Si le parsing échoue, ne pas ajouter ce joueur
+                    return;
+                }
+                remotePlayers.put(playerId, remotePlayer);
+
+                // Vérifier si on a déjà notifié ce joueur
+                if (notifiedPlayers.add(playerId)) {
+                    isNewPlayer = true;
+                }
+            } else {
+                remotePlayer.fromNetworkString(positionData);
             }
-            remotePlayers.put(playerId, remotePlayer);
-            isNewPlayer = true;
-        } else {
-            remotePlayer.fromNetworkString(positionData);
         }
 
-        if (listener != null) {
+        // Ne notifier que si la position est valide
+        if (listener != null && remotePlayer.isPositionInitialized()) {
             if (isNewPlayer) {
                 listener.onPlayerJoin(playerId);
             }
@@ -92,6 +105,7 @@ public class GameNetworkAdapter {
 
     void onPlayerDisconnected(String playerId) {
         Joueur removed = remotePlayers.remove(playerId);
+        notifiedPlayers.remove(playerId); // Permettre une re-notification si le joueur revient
         if (removed != null && listener != null) {
             listener.onPlayerLeave(playerId);
         }

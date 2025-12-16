@@ -9,6 +9,7 @@ public class Joueur {
     private double x;
     private double y;
     private double angle;
+    private boolean positionInitialized = false; // Flag pour savoir si la position est valide
 
     /**
      * Constructeur avec identifiant (pour multijoueur)
@@ -18,6 +19,7 @@ public class Joueur {
         this.x = x;
         this.y = y;
         this.angle = normalizeAngle(angle);
+        this.positionInitialized = true; // Position explicitement définie
     }
 
     /**
@@ -25,6 +27,21 @@ public class Joueur {
      */
     public Joueur(double x, double y, double angle) {
         this("local", x, y, angle);
+    }
+
+    /**
+     * Constructeur pour joueur distant non initialisé
+     */
+    public Joueur(String id) {
+        this.id = id;
+        this.x = 0;
+        this.y = 0;
+        this.angle = 0;
+        this.positionInitialized = false; // Position pas encore reçue
+    }
+
+    public boolean isPositionInitialized() {
+        return positionInitialized;
     }
 
     public String getId() {
@@ -66,6 +83,7 @@ public class Joueur {
         this.x = x;
         this.y = y;
         this.angle = normalizeAngle(angle);
+        this.positionInitialized = true;
     }
 
     /**
@@ -95,11 +113,13 @@ public class Joueur {
                 this.x = Double.parseDouble(parts[0].trim());
                 this.y = Double.parseDouble(parts[1].trim());
                 this.angle = normalizeAngle(Double.parseDouble(parts[2].trim()));
+                this.positionInitialized = true;
                 return true;
             } else if (parts.length == 2) {
                 // Compatibilité avec l'ancien format x,y sans angle
                 this.x = Double.parseDouble(parts[0].trim());
                 this.y = Double.parseDouble(parts[1].trim());
+                this.positionInitialized = true;
                 return true;
             }
         } catch (NumberFormatException e) {
@@ -112,7 +132,7 @@ public class Joueur {
      * Crée un nouveau joueur à partir d'une chaîne réseau
      */
     public static Joueur fromNetwork(String id, String data) {
-        Joueur j = new Joueur(id, 0, 0, 0);
+        Joueur j = new Joueur(id); // Utiliser le constructeur non initialisé
         j.fromNetworkString(data);
         return j;
     }
