@@ -1,11 +1,15 @@
 package prototype_raycasting;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,6 +25,18 @@ public class Raycasting extends JFrame {
 
     private List<Sprite> sprites = new CopyOnWriteArrayList<>();
     private double[] zBuffer;
+
+    // Texture du mur
+    private BufferedImage wallTexture;
+    private int[] wallTexturePixels; // Pixels de la texture en tableau pour accès rapide
+    private int texWidth = 64;
+    private int texHeight = 64;
+
+    // Buffer de rendu pour optimisation
+    private BufferedImage screenBuffer;
+    private int[] screenPixels;
+    private int lastScreenWidth = 0;
+    private int lastScreenHeight = 0;
 
     // Logs à afficher en haut à gauche
     private List<LogMessage> logMessages = new CopyOnWriteArrayList<>();
@@ -92,6 +108,9 @@ public class Raycasting extends JFrame {
         this.joueur = j;
         render = false;
 
+        // Charger la texture du mur
+        loadWallTexture();
+
         panelDessin = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -155,6 +174,51 @@ public class Raycasting extends JFrame {
         this.playerList.addAll(remotePlayers);
     }
 
+    /**
+     * Charger la texture du mur depuis le fichier assets/wall.png
+     */
+    private void loadWallTexture() {
+        try {
+            File textureFile = new File("assets/wall.png");
+            if (textureFile.exists()) {
+                BufferedImage loaded = ImageIO.read(textureFile);
+                // Convertir en TYPE_INT_ARGB pour accès rapide aux pixels
+                texWidth = loaded.getWidth();
+                texHeight = loaded.getHeight();
+                wallTexture = new BufferedImage(texWidth, texHeight, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2d = wallTexture.createGraphics();
+                g2d.drawImage(loaded, 0, 0, null);
+                g2d.dispose();
+
+                // Extraire les pixels dans un tableau pour accès ultra-rapide
+                wallTexturePixels = new int[texWidth * texHeight];
+                wallTexture.getRGB(0, 0, texWidth, texHeight, wallTexturePixels, 0, texWidth);
+
+                System.out.println("Texture du mur chargée: " + texWidth + "x" + texHeight);
+            } else {
+                System.err.println("Fichier texture non trouvé: assets/wall.png - Utilisation des couleurs par défaut");
+                wallTexture = null;
+                wallTexturePixels = null;
+            }
+        } catch (IOException e) {
+            System.err.println("Erreur lors du chargement de la texture: " + e.getMessage());
+            wallTexture = null;
+            wallTexturePixels = null;
+        }
+    }
+
+    /**
+     * Initialiser ou redimensionner le buffer de rendu
+     */
+    private void initScreenBuffer(int width, int height) {
+        if (screenBuffer == null || lastScreenWidth != width || lastScreenHeight != height) {
+            screenBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            screenPixels = ((DataBufferInt) screenBuffer.getRaster().getDataBuffer()).getData();
+            lastScreenWidth = width;
+            lastScreenHeight = height;
+        }
+    }
+
     private void dessiner(Graphics g) {
         //on code le raycasting ici
         //on utilise DDA pour trouver les murs
@@ -170,18 +234,35 @@ public class Raycasting extends JFrame {
         int screenWidth = panelDessin.getWidth();
         int screenHeight = panelDessin.getHeight();
 
+        if (screenWidth <= 0 || screenHeight <= 0) return;
+
+        // Initialiser le buffer
+        initScreenBuffer(screenWidth, screenHeight);
+
         // Initialiser le z-buffer
         zBuffer = new double[screenWidth];
 
-        //dessiner le ciel et le sol
-        g.setColor(new Color(135, 206, 235)); // Bleu ciel
-        g.fillRect(0, 0, screenWidth, screenHeight / 2);
-        g.setColor(new Color(105, 105, 105)); // Gris sol
-        g.fillRect(0, screenHeight / 2, screenWidth, screenHeight / 2);
+        // Couleurs pour le ciel et le sol
+        int skyColor = new Color(135, 206, 235).getRGB();
+        int floorColor = new Color(105, 105, 105).getRGB();
+
+        // Remplir le ciel et le sol dans le buffer
+        int halfHeight = screenHeight / 2;
+        for (int y = 0; y < screenHeight; y++) {
+            int color = (y < halfHeight) ? skyColor : floorColor;
+            int rowStart = y * screenWidth;
+            for (int x = 0; x < screenWidth; x++) {
+                screenPixels[rowStart + x] = color;
+            }
+        }
 
         //FOV (champ de vision) en radians - utilise le parametre FOV
         double fov = Math.toRadians(FOV); // Conversion des degrés en radians
         int numRays = NUM_RAYS; // Utilise le parametre NUM_RAYS
+
+        // Couleurs par défaut pour les murs (sans texture)
+        int wallColorLight = new Color(200, 100, 0).getRGB();
+        int wallColorDark = new Color(150, 75, 0).getRGB();
 
         //lancer les rayons
         for (int i = 0; i < numRays; i++) {
@@ -246,9 +327,9 @@ public class Raycasting extends JFrame {
             //calculer la distance perpendiculaire au mur (pour éviter l'effet fish-eye)
             double perpWallDist;
             if (!side) {
-                perpWallDist = (mapX - joueurX + (1 - stepX) / 2) / rayDirX;
+                perpWallDist = (mapX - joueurX + (1 - stepX) / 2.0) / rayDirX;
             } else {
-                perpWallDist = (mapY - joueurY + (1 - stepY) / 2) / rayDirY;
+                perpWallDist = (mapY - joueurY + (1 - stepY) / 2.0) / rayDirY;
             }
 
             // Calculer la hauteur du mur à l'écran
@@ -259,44 +340,89 @@ public class Raycasting extends JFrame {
                 lineHeight = screenHeight;
             }
 
+            //calculer les positions de début et fin du mur (valeurs non clampées pour le calcul de texture)
+            int drawStartRaw = -lineHeight / 2 + screenHeight / 2;
+            int drawEndRaw = lineHeight / 2 + screenHeight / 2;
+
+            // Valeurs clampées pour le dessin réel
+            int drawStart = Math.max(0, drawStartRaw);
+            int drawEnd = Math.min(screenHeight - 1, drawEndRaw);
+
             //calculer les positions de début et fin du mur
-            int drawStart = -lineHeight / 2 + screenHeight / 2;
             if (drawStart < 0) drawStart = 0;
 
-            int drawEnd = lineHeight / 2 + screenHeight / 2;
             if (drawEnd >= screenHeight) drawEnd = screenHeight - 1;
 
-            //choisir la couleur du mur (plus sombre pour les cotes Y)
-            //pour ajouter un effet de texture simple
-            Color wallColor;
-            if (side) {
-                wallColor = new Color(150, 75, 0); //marron fonce
-            } else {
-                wallColor = new Color(200, 100, 0); //marron clair
-            }
-
-            //dessiner la ligne verticale du mur
             //calculer la position et largeur de chaque colonne pour éviter les gaps
             int x1 = (i * screenWidth) / numRays;
             int x2 = ((i + 1) * screenWidth) / numRays;
             int rayWidth = x2 - x1;
 
-            g.setColor(wallColor);
-            g.fillRect(x1, drawStart, rayWidth, drawEnd - drawStart + 1);
+            //calculer la coordonnée X de la texture (wallX)
+            double wallX;
+            if (!side) {
+                wallX = joueurY + perpWallDist * rayDirY;
+            } else {
+                wallX = joueurX + perpWallDist * rayDirX;
+            }
+            wallX -= Math.floor(wallX); // Garder uniquement la partie décimale
 
-            //remplir le z-buffer pour chaque pixel de cette colonne
-            for (int x = x1; x < x2 && x < screenWidth; x++) {
-                zBuffer[x] = perpWallDist;
+            //calculer la coordonnée X dans la texture
+            int texX = (int)(wallX * texWidth);
+            if ((!side && rayDirX > 0) || (side && rayDirY < 0)) {
+                texX = texWidth - texX - 1;
+            }
+            texX = Math.max(0, Math.min(texWidth - 1, texX));
+
+            //dessiner les colonnes du mur
+            for (int screenX = x1; screenX < x2 && screenX < screenWidth; screenX++) {
+                zBuffer[screenX] = perpWallDist;
+
+                if (wallTexturePixels != null) {
+                    //avec texture - dessiner pixel par pixel
+                    for (int y = drawStart; y <= drawEnd; y++) {
+                        //calculer la position relative dans le mur (0.0 à 1.0)
+                        //d = position verticale relative au mur entier
+                        double d = (double)(y - drawStartRaw) / (double)(drawEndRaw - drawStartRaw);
+
+                        //convertir en coordonnée de texture
+                        int texY = (int)(d * texHeight);
+                        if (texY < 0) texY = 0;
+                        if (texY >= texHeight) texY = texHeight - 1;
+
+                        int color = wallTexturePixels[texY * texWidth + texX];
+
+                        //assombrir les côtés Y
+                        if (side) {
+                            int r = ((color >> 16) & 0xFF) >> 1;
+                            int gCol = ((color >> 8) & 0xFF) >> 1;
+                            int b = (color & 0xFF) >> 1;
+                            color = (0xFF << 24) | (r << 16) | (gCol << 8) | b;
+                        }
+
+                        screenPixels[y * screenWidth + screenX] = color;
+                    }
+                } else {
+                    //sans texture
+                    int color = side ? wallColorDark : wallColorLight;
+
+                    for (int y = drawStart; y <= drawEnd; y++) {
+                        screenPixels[y * screenWidth + screenX] = color;
+                    }
+                }
             }
         }
 
-        // Dessiner les sprites avec pseudos
+        //dessiner le buffer à l'écran
+        g.drawImage(screenBuffer, 0, 0, null);
+
+        //dessiner les sprites (utilise Graphics classique car plus complexe)
         dessinerSprites(g, screenWidth, screenHeight, joueurX, joueurY, joueurAngle, fov);
 
-        // Dessiner les logs en haut à gauche
+        //dessiner les logs en haut à gauche
         dessinerLogs(g);
 
-        // Dessiner le scoreboard si Tab est pressé
+        //dessiner le scoreboard si Tab est pressé
         if (showScoreboard) {
             dessinerScoreboard(g, screenWidth, screenHeight);
         }
