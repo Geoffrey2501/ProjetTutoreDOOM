@@ -14,6 +14,8 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
     public boolean forward, backward, strafeLeft, strafeRight, turnLeft, turnRight;
     public boolean showScoreboard; // Touche Tab pour afficher le tableau des joueurs
     public int mouseX, mouseY;
+    public boolean escape;
+    public boolean mouseLeftClicked;
 
     /**
      * Désactive le focus traversal pour que Tab soit capturé
@@ -45,6 +47,7 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
             case KeyEvent.VK_LEFT                   -> turnLeft = down;
             case KeyEvent.VK_RIGHT                  -> turnRight = down;
             case KeyEvent.VK_TAB                    -> showScoreboard = down;
+            case KeyEvent.VK_ESCAPE                 -> escape = down;
         }
     }
 
@@ -66,6 +69,9 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
 
     @Override
     public void mousePressed(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON1) {
+            mouseLeftClicked = true;
+        }
     }
 
     @Override
