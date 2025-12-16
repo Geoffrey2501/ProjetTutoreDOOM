@@ -54,12 +54,65 @@ public class P2PClient {
         clientNode.printStatus();
 
         System.out.println("\nLe client reçoit maintenant les mises à jour du réseau P2P");
-        System.out.println("Appuyez sur Entrée pour quitter...");
-        scanner.nextLine();
-        scanner.nextLine();
+        System.out.println("\n=== Commandes disponibles ===");
+        System.out.println("  pos X Y    - Envoyer une position (ex: pos 100 200)");
+        System.out.println("  move X Y   - Déplacer le joueur (ex: move 50 75)");
+        System.out.println("  status     - Afficher l'état du réseau");
+        System.out.println("  quit       - Quitter le client");
+        System.out.println("=============================\n");
+
+        // Boucle de commande interactive
+        boolean running = true;
+        while (running) {
+            System.out.print("[" + playerName + "] > ");
+            String input = scanner.nextLine().trim();
+
+            if (input.isEmpty()) {
+                continue;
+            }
+
+            String[] parts = input.split("\\s+");
+            String command = parts[0].toLowerCase();
+
+            switch (command) {
+                case "pos":
+                case "move":
+                    if (parts.length >= 3) {
+                        try {
+                            int x = Integer.parseInt(parts[1]);
+                            int y = Integer.parseInt(parts[2]);
+                            clientNode.movePlayer(x, y);
+                            System.out.println("Position envoyée: (" + x + ", " + y + ")");
+                        } catch (NumberFormatException e) {
+                            System.out.println("Erreur: Les coordonnées doivent être des nombres entiers.");
+                            System.out.println("Usage: pos X Y (ex: pos 100 200)");
+                        }
+                    } else {
+                        System.out.println("Usage: pos X Y (ex: pos 100 200)");
+                    }
+                    break;
+
+                case "status":
+                    clientNode.printStatus();
+                    break;
+
+                case "quit":
+                case "exit":
+                case "q":
+                    running = false;
+                    System.out.println("Déconnexion en cours...");
+                    break;
+
+                default:
+                    System.out.println("Commande inconnue: " + command);
+                    System.out.println("Commandes disponibles: pos, move, status, quit");
+                    break;
+            }
+        }
 
         clientNode.shutdown();
         scanner.close();
+        System.out.println("Client arrêté.");
     }
 }
 

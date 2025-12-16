@@ -29,7 +29,7 @@ public class Serveur {
     private int port;
     private String host;
     private ServerSocket serverSocket;
-    private List<GestionConnection> connectedPeers = new CopyOnWriteArrayList<>();
+    protected List<GestionConnection> connectedPeers = new CopyOnWriteArrayList<>();
     private Map<String, PeerInfo> knownPeers = new ConcurrentHashMap<>();
     private ExecutorService executor = Executors.newCachedThreadPool();
     private Map<String, int[]> playerPositions = new ConcurrentHashMap<>();
@@ -49,6 +49,20 @@ public class Serveur {
         this.port = port;
         // Ajouter ce nœud à la liste des pairs connus
         knownPeers.put(nodeId, new PeerInfo(nodeId, host, port));
+    }
+
+    /**
+     * Obtenir l'identifiant du nœud
+     */
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    /**
+     * Obtenir la liste des pairs connectés (pour les sous-classes)
+     */
+    protected List<GestionConnection> getConnectedPeersList() {
+        return connectedPeers;
     }
 
     /**
