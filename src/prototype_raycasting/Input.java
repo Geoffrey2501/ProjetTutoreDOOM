@@ -10,6 +10,8 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
 
     public boolean forward, backward, strafeLeft, strafeRight, turnLeft, turnRight;
     public int mouseX, mouseY;
+    public boolean escape;
+    public boolean mouseLeftClicked;
 
     @Override
     public void keyPressed(KeyEvent e) {
@@ -28,6 +30,7 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
             case KeyEvent.VK_D                      -> strafeRight = down;
             case KeyEvent.VK_LEFT                   -> turnLeft = down;
             case KeyEvent.VK_RIGHT                  -> turnRight = down;
+            case KeyEvent.VK_ESCAPE                 -> escape = down;
         }
     }
 
@@ -49,6 +52,9 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
 
     @Override
     public void mousePressed(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON1) {
+            mouseLeftClicked = true;
+        }
     }
 
     @Override
