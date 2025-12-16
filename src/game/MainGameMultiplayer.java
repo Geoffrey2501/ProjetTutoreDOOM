@@ -26,11 +26,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     private static final String PLAYER_SPRITE_PATH = "src/prototype_raycasting/sprites/jonesy.png";
 
-    private long lastPositionSendTime = 0;
-    private static final long POSITION_SEND_INTERVAL_MS = 50;
-
-    private long lastPeriodicSendTime = 0;
-    private static final long PERIODIC_SEND_INTERVAL_MS = 1000;
 
     private boolean mouseCaptured = true;
     private boolean escapePressed = false;

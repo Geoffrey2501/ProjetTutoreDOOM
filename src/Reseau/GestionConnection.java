@@ -2,7 +2,7 @@ package Reseau;
 
 import java.io.*;
 import java.net.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Gère la connexion bidirectionnelle avec un autre pair dans le système P2P
@@ -22,9 +22,11 @@ public class GestionConnection implements Runnable {
     private Serveur localNode;
     private String remotePeerId;
 
-    // Rate limiting pour l'envoi
-    private AtomicLong lastSendTime = new AtomicLong(0);
-    private static final long MIN_SEND_INTERVAL_MS = 20; // Max ~50 messages/seconde
+    // Système de tick rate
+    private static final long TICK_INTERVAL_MS = 16; // ~60 ticks/seconde
+    private AtomicReference<String> pendingMoveMessage = new AtomicReference<>(null);
+    private Thread tickThread;
+    private volatile boolean running = true;
 
     /**
      * Constructeur de la connexion pair-à-pair
@@ -38,9 +40,32 @@ public class GestionConnection implements Runnable {
         try {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            startTickSystem();
         } catch (IOException e) {
             // Ignorer
         }
+    }
+
+    /**
+     * Démarre le système de tick rate pour l'envoi régulier des messages
+     */
+    private void startTickSystem() {
+        tickThread = new Thread(() -> {
+            while (running) {
+                try {
+                    Thread.sleep(TICK_INTERVAL_MS);
+                    String message = pendingMoveMessage.getAndSet(null);
+                    if (message != null && out != null) {
+                        out.println(message);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+        tickThread.setDaemon(true);
+        tickThread.start();
     }
 
     /**
@@ -63,28 +88,21 @@ public class GestionConnection implements Runnable {
     }
 
     /**
-     * Envoyer un message au pair avec rate limiting
+     * Envoyer un message au pair avec tick rate
      *
      * Format : "NomJoueur:X,Y"
      *
      * @param message Message à envoyer
      */
     public void sendMessage(String message) {
-        if (out != null) {
-            long now = System.currentTimeMillis();
-            long last = lastSendTime.get();
-
-            //rate limiting seulement pour les messages MOVE (pas pour PEER_LIST, etc.)
+        if (out != null && message != null) {
             if (message.startsWith("MOVE:")) {
-                if (now - last < MIN_SEND_INTERVAL_MS) {
-                    return; //ignorer ce message, trop rapide
-                    //sinon sa plante certain pc à cause de la surcharge du buffer
-                    //TODO: implementer des tickrate pour eviter ce probleme et ne pas perdre de messages
-                }
-                lastSendTime.set(now);
+                // Stocker le dernier message MOVE, sera envoyé au prochain tick
+                pendingMoveMessage.set(message);
+            } else {
+                // Envoyer immédiatement les autres types de messages
+                out.println(message);
             }
-
-            out.println(message);
         }
     }
 
@@ -103,6 +121,10 @@ public class GestionConnection implements Runnable {
      * Ferme le socket et notifie le nœud local de la déconnexion.
      */
     public void disconnect() {
+        running = false;
+        if (tickThread != null) {
+            tickThread.interrupt();
+        }
         try {
             socket.close();
             localNode.removePeer(this);
