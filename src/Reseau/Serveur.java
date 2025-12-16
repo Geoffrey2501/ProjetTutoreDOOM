@@ -23,7 +23,7 @@ import java.util.concurrent.*;
  * @author Groupe DOOM
  * @version 1.0
  */
-public class P2PNode {
+public class Serveur {
 
     private String nodeId;
     private int port;
@@ -43,7 +43,7 @@ public class P2PNode {
      * @param host   Adresse IP du nœud (ex: "localhost", "192.168.1.10")
      * @param port   Port d'écoute du serveur (ex: 5001)
      */
-    public P2PNode(String nodeId, String host, int port) {
+    public Serveur(String nodeId, String host, int port) {
         this.nodeId = nodeId;
         this.host = host;
         this.port = port;

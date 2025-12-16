@@ -20,7 +20,7 @@ public class GestionConnectionTest {
     private Socket clientSocket;
     private Socket serverSideSocket;
     private GestionConnection gestionConnection;
-    private P2PNode mockNode;
+    private Serveur mockNode;
     private static int testPort = 10001;
 
     private PrintWriter clientOut;
@@ -29,7 +29,7 @@ public class GestionConnectionTest {
     @BeforeEach
     void setUp() throws IOException, InterruptedException {
         testPort += 10;
-        mockNode = new P2PNode("MockNode", testPort + 100);
+        mockNode = new Serveur("MockNode", testPort + 100);
         mockNode.start();
 
         // Créer un serveur temporaire pour les tests

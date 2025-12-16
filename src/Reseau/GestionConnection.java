@@ -18,7 +18,7 @@ public class GestionConnection implements Runnable {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
-    private P2PNode localNode;
+    private Serveur localNode;
     private String remotePeerId;
 
     /**
@@ -27,7 +27,7 @@ public class GestionConnection implements Runnable {
      * @param socket    Socket de connexion avec le pair
      * @param localNode Référence au nœud local qui gère cette connexion
      */
-    public GestionConnection(Socket socket, P2PNode localNode) {
+    public GestionConnection(Socket socket, Serveur localNode) {
         this.socket = socket;
         this.localNode = localNode;
         try {
