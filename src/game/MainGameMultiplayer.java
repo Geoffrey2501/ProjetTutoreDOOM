@@ -179,15 +179,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             }
         }
 
-        long now = System.currentTimeMillis();
-
-        if (moved && (now - lastPositionSendTime >= POSITION_SEND_INTERVAL_MS)) {
+        if (moved){
             network.sendPlayerPosition();
-            lastPositionSendTime = now;
-            lastPeriodicSendTime = now;
-        }else if(now - lastPeriodicSendTime >= PERIODIC_SEND_INTERVAL_MS) {
-            network.sendPlayerPositionNow();
-            lastPeriodicSendTime = now;
         }
 
         // Gestion du scoreboard (touche Tab)
