@@ -244,7 +244,15 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
-        // Ne rien faire ici - le sprite est créé dans onPlayerJoin
+        // Si le sprite n'existe pas encore et la position est valide, le créer maintenant
+        if (!playerSprites.containsKey(playerId) && x > -999 && y > -999) {
+            Joueur remotePlayer = network.getRemotePlayer(playerId);
+            if (remotePlayer != null) {
+                Sprite playerSprite = new Sprite(x, y, PLAYER_SPRITE_PATH, playerId);
+                playerSprites.put(playerId, playerSprite);
+                raycasting.addSprite(playerSprite);
+            }
+        }
     }
 
     @Override
@@ -256,9 +264,12 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
         Joueur remotePlayer = network.getRemotePlayer(playerId);
         if (remotePlayer != null) {
-            Sprite playerSprite = new Sprite(remotePlayer.getX(), remotePlayer.getY(), PLAYER_SPRITE_PATH, playerId);
-            playerSprites.put(playerId, playerSprite);
-            raycasting.addSprite(playerSprite);
+            // Ne créer le sprite que si la position est valide (pas la position temporaire)
+            if (remotePlayer.getX() > -999 && remotePlayer.getY() > -999) {
+                Sprite playerSprite = new Sprite(remotePlayer.getX(), remotePlayer.getY(), PLAYER_SPRITE_PATH, playerId);
+                playerSprites.put(playerId, playerSprite);
+                raycasting.addSprite(playerSprite);
+            }
             raycasting.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         }
 
@@ -311,4 +322,3 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         new Thread(game).start();
     }
 }
-

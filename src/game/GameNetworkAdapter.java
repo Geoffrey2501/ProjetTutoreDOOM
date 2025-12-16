@@ -64,7 +64,13 @@ public class GameNetworkAdapter {
         Joueur remotePlayer = remotePlayers.get(playerId);
 
         if (remotePlayer == null) {
-            remotePlayer = Joueur.fromNetwork(playerId, positionData);
+            //créer le joueur avec des coordonnées temporaires
+            remotePlayer = new Joueur(playerId, -1000, -1000, 0);
+            //parser immédiatement les vraies coordonnées
+            if (!remotePlayer.fromNetworkString(positionData)) {
+                //si le parsing échoue, ne pas ajouter ce joueur
+                return;
+            }
             remotePlayers.put(playerId, remotePlayer);
             isNewPlayer = true;
         } else {
