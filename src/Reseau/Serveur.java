@@ -47,8 +47,6 @@ public class Serveur {
         this.nodeId = nodeId;
         this.host = host;
         this.port = port;
-        // Ajouter ce nœud à la liste des pairs connus
-        knownPeers.put(nodeId, new PeerInfo(nodeId, host, port));
     }
 
     /**
@@ -74,15 +72,43 @@ public class Serveur {
     public void start() {
         try {
             serverSocket = new ServerSocket(port);
-            System.out.println("[" + nodeId + "] Nœud P2P démarré sur le port " + port);
+
+            //obtenir l'IP réelle de la machine
+            String realHost = getLocalIPAddress();
+
+            //s'ajouter à la liste des pairs connus avec l'IP réelle
+            knownPeers.put(nodeId, new PeerInfo(nodeId, realHost, port));
 
             executor.execute(() -> acceptIncomingConnections());
 
             playerPositions.put(nodeId, new int[]{posX, posY});
         } catch (IOException e) {
-            System.err.println("Erreur lors du démarrage du nœud P2P: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Erreur démarrage: " + e.getMessage());
         }
+    }
+
+    /**
+     * Obtenir l'adresse IP locale de la machine (pas localhost)
+     */
+    private String getLocalIPAddress() {
+        try {
+            //essayer de trouver une IP non-loopback
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (SocketException e) {
+        }
+        return host;
     }
 
     /**
@@ -96,19 +122,14 @@ public class Serveur {
         try {
             while (!serverSocket.isClosed()) {
                 Socket peerSocket = serverSocket.accept();
-                System.out.println("[" + nodeId + "] Nouveau pair connecté: " + peerSocket.getInetAddress());
-
                 GestionConnection peerConnection = new GestionConnection(peerSocket, this);
                 connectedPeers.add(peerConnection);
                 executor.execute(peerConnection);
 
-                // IMPORTANT : Envoyer la liste des pairs connus au nouveau connecté
+                //IMPORTANT : Envoyer la liste des pairs connus au nouveau connecté
                 sendPeerListTo(peerConnection);
             }
         } catch (IOException e) {
-            if (!serverSocket.isClosed()) {
-                System.err.println("Erreur lors de l'acceptation des connexions: " + e.getMessage());
-            }
         }
     }
 
@@ -122,14 +143,12 @@ public class Serveur {
     public void connectToNode(String remoteNodeId, String host, int remotePort) {
         // Vérifier si on n'est pas déjà connecté à ce pair
         if (knownPeers.containsKey(remoteNodeId) && remoteNodeId.equals(nodeId)) {
-            System.out.println("[" + nodeId + "] Tentative de connexion à soi-même ignorée");
             return;
         }
 
         // Vérifier si on est déjà connecté à ce pair
         for (GestionConnection peer : connectedPeers) {
             if (remoteNodeId.equals(peer.getRemotePeerId())) {
-                System.out.println("[" + nodeId + "] Déjà connecté à " + remoteNodeId);
                 return;
             }
         }
@@ -137,8 +156,6 @@ public class Serveur {
         executor.execute(() -> {
             try {
                 Socket socket = new Socket(host, remotePort);
-                System.out.println("[" + nodeId + "] → " + remoteNodeId);
-
                 GestionConnection peerConnection = new GestionConnection(socket, this);
                 peerConnection.setRemotePeerId(remoteNodeId);
                 connectedPeers.add(peerConnection);
@@ -152,7 +169,6 @@ public class Serveur {
                 // Annoncer ce nouveau pair à tous les autres pairs connectés
                 broadcastNewPeer(peerInfo);
             } catch (IOException e) {
-                System.err.println("[" + nodeId + "] Erreur connexion à " + remoteNodeId + ": " + e.getMessage());
             }
         });
     }
@@ -169,7 +185,6 @@ public class Serveur {
         playerPositions.put(nodeId, new int[]{posX, posY});
 
         broadcastToPeers("MOVE:" + nodeId + ":" + x + "," + y);
-        System.out.println("[" + nodeId + "] Position: (" + x + ", " + y + ")");
     }
 
     /**
@@ -208,11 +223,9 @@ public class Serveur {
             } else if (message.startsWith("NEW_PEER:")) {
                 processNewPeerMessage(message);
             } else {
-                // Format ancien pour compatibilité : "NomJoueur:X,Y"
                 processLegacyMoveMessage(message, sender);
             }
         } catch (Exception e) {
-            System.err.println("[" + nodeId + "] Erreur parsing message: " + message);
         }
     }
 
@@ -228,13 +241,18 @@ public class Serveur {
 
             String playerId = parts[0];
             String[] coords = parts[1].split(",");
-            if (coords.length != 2) return;
+            if (coords.length < 2) return;
 
-            int x = Integer.parseInt(coords[0].trim());
-            int y = Integer.parseInt(coords[1].trim());
+            //mettre à jour le peerId du sender si pas encore fait
+            if (sender.getRemotePeerId() == null) {
+                sender.setRemotePeerId(playerId);
+                onPeerConnected(playerId);
+            }
+
+            int x = Integer.parseInt(coords[0].trim().split("\\.")[0]); //gérer les doubles
+            int y = Integer.parseInt(coords[1].trim().split("\\.")[0]);
 
             playerPositions.put(playerId, new int[]{x, y});
-            System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
 
             // Relayer aux autres pairs
             for (GestionConnection peer : connectedPeers) {
@@ -265,19 +283,14 @@ public class Serveur {
                 if (peerInfo.getPeerId().equals(nodeId)) continue;
 
                 // Ne pas se connecter si déjà connu
-                if (knownPeers.containsKey(peerInfo.getPeerId())) {
-                    System.out.println("[" + nodeId + "] Pair déjà connu: " + peerInfo.getPeerId());
-                    continue;
-                }
+                if (knownPeers.containsKey(peerInfo.getPeerId())) continue;
 
-                System.out.println("[" + nodeId + "] Nouveau pair découvert via liste: " + peerInfo);
                 knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
                 // Se connecter au nouveau pair
                 connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
             }
         } catch (Exception e) {
-            System.err.println("[" + nodeId + "] Erreur traitement PEER_LIST: " + e.getMessage());
         }
     }
 
@@ -295,17 +308,13 @@ public class Serveur {
             if (peerInfo.getPeerId().equals(nodeId)) return;
 
             // Ne pas se connecter si déjà connu
-            if (knownPeers.containsKey(peerInfo.getPeerId())) {
-                return;
-            }
+            if (knownPeers.containsKey(peerInfo.getPeerId())) return;
 
-            System.out.println("[" + nodeId + "] Nouveau pair annoncé: " + peerInfo);
             knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
             // Se connecter au nouveau pair
             connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
         } catch (Exception e) {
-            System.err.println("[" + nodeId + "] Erreur traitement NEW_PEER: " + e.getMessage());
         }
     }
 
@@ -325,7 +334,6 @@ public class Serveur {
             int y = Integer.parseInt(coords[1].trim());
 
             playerPositions.put(playerId, new int[]{x, y});
-            System.out.println("[" + nodeId + "] " + playerId + ": (" + x + ", " + y + ")");
 
             // Relayer aux autres pairs
             for (GestionConnection peer : connectedPeers) {
@@ -344,23 +352,17 @@ public class Serveur {
      * @param connection Connexion à laquelle envoyer la liste
      */
     private void sendPeerListTo(GestionConnection connection) {
-        if (knownPeers.isEmpty()) {
-            return;
-        }
+        if (knownPeers.isEmpty()) return;
 
         StringBuilder sb = new StringBuilder("PEER_LIST:");
         boolean first = true;
         for (PeerInfo peerInfo : knownPeers.values()) {
-            if (!first) {
-                sb.append(";");
-            }
+            if (!first) sb.append(";");
             sb.append(peerInfo.toString());
             first = false;
         }
 
-        String message = sb.toString();
-        connection.sendMessage(message);
-        System.out.println("[" + nodeId + "] Liste des pairs envoyée: " + message);
+        connection.sendMessage(sb.toString());
     }
 
     /**
@@ -371,7 +373,6 @@ public class Serveur {
     private void broadcastNewPeer(PeerInfo peerInfo) {
         String message = "NEW_PEER:" + peerInfo.toString();
         broadcastToPeers(message);
-        System.out.println("[" + nodeId + "] Nouveau pair annoncé au réseau: " + peerInfo);
     }
 
     /**
@@ -381,7 +382,26 @@ public class Serveur {
      */
     public void removePeer(GestionConnection peer) {
         connectedPeers.remove(peer);
-        System.out.println("[" + nodeId + "] Pair déconnecté. Pairs restants: " + connectedPeers.size());
+        String peerId = peer.getRemotePeerId();
+        if (peerId != null) {
+            onPeerDisconnected(peerId);
+        }
+    }
+
+    /**
+     * Callback appelé quand un pair se déconnecte
+     * Peut être surchargé par les sous-classes
+     */
+    protected void onPeerDisconnected(String peerId) {
+        // Par défaut, ne fait rien - à surcharger dans les sous-classes
+    }
+
+    /**
+     * Callback appelé quand un nouveau pair est connecté et identifié
+     * Peut être surchargé par les sous-classes
+     */
+    protected void onPeerConnected(String peerId) {
+        // Par défaut, ne fait rien - à surcharger dans les sous-classes
     }
 
     /**
@@ -430,9 +450,8 @@ public class Serveur {
             }
             serverSocket.close();
             executor.shutdown();
-            System.out.println("[" + nodeId + "] Nœud arrêté");
         } catch (IOException e) {
-            e.printStackTrace();
+            // Ignorer
         }
     }
 }

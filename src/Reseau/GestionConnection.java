@@ -2,6 +2,7 @@ package Reseau;
 
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Gère la connexion bidirectionnelle avec un autre pair dans le système P2P
@@ -21,6 +22,10 @@ public class GestionConnection implements Runnable {
     private Serveur localNode;
     private String remotePeerId;
 
+    // Rate limiting pour l'envoi
+    private AtomicLong lastSendTime = new AtomicLong(0);
+    private static final long MIN_SEND_INTERVAL_MS = 20; // Max ~50 messages/seconde
+
     /**
      * Constructeur de la connexion pair-à-pair
      *
@@ -34,7 +39,7 @@ public class GestionConnection implements Runnable {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
-            e.printStackTrace();
+            // Ignorer
         }
     }
 
@@ -51,16 +56,14 @@ public class GestionConnection implements Runnable {
                 localNode.processMessageFromPeer(message, this);
             }
         } catch (IOException e) {
-            if (remotePeerId != null) {
-                System.out.println("Déconnexion de " + remotePeerId);
-            }
+            //deconnexion
         } finally {
             disconnect();
         }
     }
 
     /**
-     * Envoyer un message au pair
+     * Envoyer un message au pair avec rate limiting
      *
      * Format : "NomJoueur:X,Y"
      *
@@ -68,6 +71,19 @@ public class GestionConnection implements Runnable {
      */
     public void sendMessage(String message) {
         if (out != null) {
+            long now = System.currentTimeMillis();
+            long last = lastSendTime.get();
+
+            //rate limiting seulement pour les messages MOVE (pas pour PEER_LIST, etc.)
+            if (message.startsWith("MOVE:")) {
+                if (now - last < MIN_SEND_INTERVAL_MS) {
+                    return; //ignorer ce message, trop rapide
+                    //sinon sa plante certain pc à cause de la surcharge du buffer
+                    //TODO: implementer des tickrate pour eviter ce probleme et ne pas perdre de messages
+                }
+                lastSendTime.set(now);
+            }
+
             out.println(message);
         }
     }
@@ -91,7 +107,6 @@ public class GestionConnection implements Runnable {
             socket.close();
             localNode.removePeer(this);
         } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -104,4 +119,3 @@ public class GestionConnection implements Runnable {
         return remotePeerId;
     }
 }
-

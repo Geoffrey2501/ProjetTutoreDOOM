@@ -10,6 +10,7 @@ public class Sprite {
     private double x;
     private double y;
     private BufferedImage image;
+    private String playerId; // Pour associer un sprite à un joueur spécifique (multijoueur)
 
     public Sprite(double x, double y, String imagePath) {
         this.x = x;
@@ -19,6 +20,17 @@ public class Sprite {
         } catch (IOException e) {
             this.image = createDefaultImage();
         }
+    }
+
+    public Sprite(double x, double y, String imagePath, String playerId) {
+        this.x = x;
+        this.y = y;
+        try {
+            this.image = ImageIO.read(new File(imagePath));
+        } catch (IOException e) {
+            this.image = createDefaultImage();
+        }
+        this.playerId = playerId;
     }
 
     public Sprite(double x, double y) {
@@ -47,4 +59,6 @@ public class Sprite {
 
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
+
+    public String getPlayerName() { return playerId; }
 }

@@ -8,6 +8,7 @@ import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Raycasting extends JFrame {
 
@@ -16,22 +17,39 @@ public class Raycasting extends JFrame {
     private Map map;
     private Joueur joueur;
     private int FOV = 60;
-    private int NUM_RAYS = 1000; //"definition" de la qualite du rendu
+    private int NUM_RAYS = 1000;
 
-    private List<Sprite> sprites = new ArrayList<>();
-    private double[] zBuffer; // Pour stocker les distances des murs
+    private List<Sprite> sprites = new CopyOnWriteArrayList<>();
+    private double[] zBuffer;
+
+    // Logs à afficher en haut à gauche
+    private List<LogMessage> logMessages = new CopyOnWriteArrayList<>();
+    private static final int MAX_LOGS = 5;
+    private static final long LOG_DURATION_MS = 5000; // 5 secondes
+
+    private static class LogMessage {
+        String text;
+        long timestamp;
+        Color color;
+
+        LogMessage(String text, Color color) {
+            this.text = text;
+            this.color = color;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() - timestamp > LOG_DURATION_MS;
+        }
+    }
 
     public Raycasting(Map m, Joueur j) {
-        //le titre de la fenetre
         super("Prototype Raycasting");
 
         this.map = m;
         this.joueur = j;
-
-        //booleen pour ne pas rendre à l'initialisation du panel
         render = false;
 
-        //créer le panel de dessin
         panelDessin = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -44,14 +62,12 @@ public class Raycasting extends JFrame {
         panelDessin.setBackground(Color.BLACK);
         add(panelDessin);
 
-        //quitter l'application quand on ferme la fenetre
         WindowListener l = new WindowAdapter() {
             public void windowClosing(WindowEvent e){
                 System.exit(0);
             }
         };
 
-        //ajouter le listener a la fenetre
         addWindowListener(l);
         setSize(1920, 1080);
         setVisible(true);
@@ -65,7 +81,21 @@ public class Raycasting extends JFrame {
         sprites.remove(sprite);
     }
 
-    //methode qui effectue le dessin
+    /**
+     * Ajouter un message de log à afficher
+     */
+    public void addLogMessage(String message, Color color) {
+        logMessages.add(new LogMessage(message, color));
+        // Limiter le nombre de logs
+        while (logMessages.size() > MAX_LOGS) {
+            logMessages.remove(0);
+        }
+    }
+
+    public void addLogMessage(String message) {
+        addLogMessage(message, Color.RED);
+    }
+
     private void dessiner(Graphics g) {
         //on code le raycasting ici
         //on utilise DDA pour trouver les murs
@@ -201,14 +231,16 @@ public class Raycasting extends JFrame {
             }
         }
 
-        // Dessiner les sprites
+        // Dessiner les sprites avec pseudos
         dessinerSprites(g, screenWidth, screenHeight, joueurX, joueurY, joueurAngle, fov);
+
+        // Dessiner les logs en haut à gauche
+        dessinerLogs(g);
     }
 
     private void dessinerSprites(Graphics g, int screenWidth, int screenHeight,
                                   double joueurX, double joueurY, double joueurAngle, double fov) {
 
-        //trier les sprites par distance (du plus loin au plus proche)
         List<Sprite> sortedSprites = new ArrayList<>(sprites);
         sortedSprites.sort((a, b) -> {
             double distA = (a.getX() - joueurX) * (a.getX() - joueurX) + (a.getY() - joueurY) * (a.getY() - joueurY);
@@ -281,6 +313,58 @@ public class Raycasting extends JFrame {
                             null);
                 }
             }
+
+            //dessiner le pseudo au dessus du sprite
+            String playerName = sprite.getPlayerName();
+            if (playerName != null && !playerName.isEmpty()) {
+                g2d.setFont(new Font("Arial", Font.BOLD, 16));
+                FontMetrics fm = g2d.getFontMetrics();
+                int textWidth = fm.stringWidth(playerName);
+                int textX = spriteScreenX - textWidth / 2;
+                int textY = drawStartY - 10;
+
+                //fond gris style pseudo minecraft
+                g2d.setColor(new Color(0, 0, 0, 150));
+                g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight() + 4);
+
+                g2d.setColor(Color.WHITE);
+                g2d.drawString(playerName, textX, textY);
+            }
+        }
+    }
+
+    private void dessinerLogs(Graphics g) {
+        //supprimer les logs expirés
+        logMessages.removeIf(LogMessage::isExpired);
+
+        if (logMessages.isEmpty()) return;
+
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        FontMetrics fm = g2d.getFontMetrics();
+
+        int y = 30;
+        for (LogMessage log : logMessages) {
+            //petit fondu des logs avant disparition pour le style
+            long age = System.currentTimeMillis() - log.timestamp;
+            float alpha = 1.0f;
+            if (age > LOG_DURATION_MS - 1000) {
+                alpha = (LOG_DURATION_MS - age) / 1000.0f;
+            }
+
+            g2d.setColor(new Color(0, 0, 0, (int)(150 * alpha)));
+            g2d.fillRect(10, y - fm.getAscent(), fm.stringWidth(log.text) + 10, fm.getHeight() + 4);
+
+            Color textColor = new Color(
+                log.color.getRed(),
+                log.color.getGreen(),
+                log.color.getBlue(),
+                (int)(255 * alpha)
+            );
+            g2d.setColor(textColor);
+            g2d.drawString(log.text, 15, y);
+
+            y += fm.getHeight() + 8;
         }
     }
 

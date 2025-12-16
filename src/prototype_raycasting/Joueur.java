@@ -70,20 +70,27 @@ public class Joueur {
 
     /**
      * Sérialise la position du joueur pour l'envoi réseau
-     * Format: "x,y,angle"
+     * Format: "x;y;angle" (utilise ; comme séparateur pour éviter les conflits avec le format décimal)
      */
     public String toNetworkString() {
-        return String.format("%.4f,%.4f,%.4f", x, y, angle);
+        return String.format(java.util.Locale.US, "%.4f;%.4f;%.4f", x, y, angle);
     }
 
     /**
      * Parse une chaîne réseau et met à jour la position
-     * Format attendu: "x,y,angle"
+     * Format attendu: "x;y;angle" ou ancien format "x,y,angle"
      * @return true si le parsing a réussi
      */
     public boolean fromNetworkString(String data) {
         try {
-            String[] parts = data.split(",");
+            // Supporter les deux séparateurs
+            String[] parts;
+            if (data.contains(";")) {
+                parts = data.split(";");
+            } else {
+                parts = data.split(",");
+            }
+
             if (parts.length >= 3) {
                 this.x = Double.parseDouble(parts[0].trim());
                 this.y = Double.parseDouble(parts[1].trim());
@@ -96,7 +103,7 @@ public class Joueur {
                 return true;
             }
         } catch (NumberFormatException e) {
-            System.err.println("Erreur parsing position joueur: " + data);
+            System.err.println("Erreur parsing position joueur: " + data + " - " + e.getMessage());
         }
         return false;
     }
