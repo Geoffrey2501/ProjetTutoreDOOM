@@ -27,6 +27,11 @@ public class Raycasting extends JFrame {
     private static final int MAX_LOGS = 5;
     private static final long LOG_DURATION_MS = 5000; // 5 secondes
 
+    // Scoreboard (tableau des joueurs)
+    private boolean showScoreboard = false;
+    private List<String> playerList = new CopyOnWriteArrayList<>();
+    private String localPlayerName = "";
+
     private static class LogMessage {
         String text;
         long timestamp;
@@ -94,6 +99,23 @@ public class Raycasting extends JFrame {
 
     public void addLogMessage(String message) {
         addLogMessage(message, Color.RED);
+    }
+
+    /**
+     * Définir si le scoreboard doit être affiché
+     */
+    public void setShowScoreboard(boolean show) {
+        this.showScoreboard = show;
+    }
+
+    /**
+     * Mettre à jour la liste des joueurs pour le scoreboard
+     */
+    public void updatePlayerList(String localPlayer, List<String> remotePlayers) {
+        this.localPlayerName = localPlayer;
+        this.playerList.clear();
+        this.playerList.add(localPlayer); // Le joueur local en premier
+        this.playerList.addAll(remotePlayers);
     }
 
     private void dessiner(Graphics g) {
@@ -236,6 +258,11 @@ public class Raycasting extends JFrame {
 
         // Dessiner les logs en haut à gauche
         dessinerLogs(g);
+
+        // Dessiner le scoreboard si Tab est pressé
+        if (showScoreboard) {
+            dessinerScoreboard(g, screenWidth, screenHeight);
+        }
     }
 
     private void dessinerSprites(Graphics g, int screenWidth, int screenHeight,
@@ -366,6 +393,88 @@ public class Raycasting extends JFrame {
 
             y += fm.getHeight() + 8;
         }
+    }
+
+    /**
+     * Dessiner le scoreboard (tableau des joueurs) au centre de l'écran
+     */
+    private void dessinerScoreboard(Graphics g, int screenWidth, int screenHeight) {
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Dimensions du tableau
+        int tableWidth = 400;
+        int rowHeight = 40;
+        int headerHeight = 50;
+        int tableHeight = headerHeight + (playerList.size() * rowHeight) + 20;
+
+        // Position centrée
+        int tableX = (screenWidth - tableWidth) / 2;
+        int tableY = (screenHeight - tableHeight) / 2;
+
+        // Fond semi-transparent
+        g2d.setColor(new Color(0, 0, 0, 200));
+        g2d.fillRoundRect(tableX, tableY, tableWidth, tableHeight, 20, 20);
+
+        // Bordure
+        g2d.setColor(new Color(100, 100, 100));
+        g2d.setStroke(new BasicStroke(3));
+        g2d.drawRoundRect(tableX, tableY, tableWidth, tableHeight, 20, 20);
+
+        // Titre
+        g2d.setFont(new Font("Arial", Font.BOLD, 24));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String title = "JOUEURS EN LIGNE";
+        int titleWidth = fmTitle.stringWidth(title);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(title, tableX + (tableWidth - titleWidth) / 2, tableY + 35);
+
+        // Ligne de séparation sous le titre
+        g2d.setColor(new Color(100, 100, 100));
+        g2d.drawLine(tableX + 20, tableY + headerHeight, tableX + tableWidth - 20, tableY + headerHeight);
+
+        // Liste des joueurs
+        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+        FontMetrics fm = g2d.getFontMetrics();
+
+        int y = tableY + headerHeight + 30;
+        int index = 1;
+
+        for (String playerName : playerList) {
+            // Indicateur pour le joueur local
+            boolean isLocal = playerName.equals(localPlayerName);
+
+            // Numéro du joueur
+            g2d.setColor(new Color(150, 150, 150));
+            g2d.drawString(String.valueOf(index) + ".", tableX + 30, y);
+
+            // Icône joueur (petit cercle coloré)
+            if (isLocal) {
+                g2d.setColor(new Color(0, 200, 0)); // Vert pour le joueur local
+            } else {
+                g2d.setColor(new Color(0, 150, 255)); // Bleu pour les autres
+            }
+            g2d.fillOval(tableX + 60, y - 12, 15, 15);
+
+            // Nom du joueur
+            if (isLocal) {
+                g2d.setColor(new Color(100, 255, 100)); // Vert clair pour le local
+                g2d.drawString(playerName + " (vous)", tableX + 85, y);
+            } else {
+                g2d.setColor(Color.WHITE);
+                g2d.drawString(playerName, tableX + 85, y);
+            }
+
+            y += rowHeight;
+            index++;
+        }
+
+        // Message d'aide en bas
+        g2d.setFont(new Font("Arial", Font.ITALIC, 12));
+        g2d.setColor(new Color(150, 150, 150));
+        String helpText = "Appuyez sur TAB pour fermer";
+        int helpWidth = g2d.getFontMetrics().stringWidth(helpText);
+        g2d.drawString(helpText, tableX + (tableWidth - helpWidth) / 2, tableY + tableHeight - 8);
     }
 
     //une methode qui permet de rendre une image avec un objet Map et un objet Joueur

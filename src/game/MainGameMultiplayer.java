@@ -5,6 +5,8 @@ import prototype_raycasting.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +42,9 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         raycasting.setFocusable(true);
         raycasting.requestFocus();
         raycasting.setVisible(true);
+
+        // Désactiver le focus traversal pour capturer la touche Tab
+        Input.disableFocusTraversal(raycasting);
 
         try {
             robot = new Robot();
@@ -154,6 +159,13 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         // Le tick rate dans GestionConnection (16ms) optimisera l'envoi automatiquement
         if (moved) {
             network.sendPlayerPosition();
+        }
+
+        // Gestion du scoreboard (touche Tab)
+        raycasting.setShowScoreboard(input.showScoreboard);
+        if (input.showScoreboard) {
+            List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
+            raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
         }
 
         updateRemotePlayerSprites();

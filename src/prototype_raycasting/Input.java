@@ -1,15 +1,31 @@
 package prototype_raycasting;
 
+import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.util.HashSet;
+import java.util.Set;
 
 public class Input extends KeyAdapter implements MouseListener, MouseMotionListener {
 
     public boolean forward, backward, strafeLeft, strafeRight, turnLeft, turnRight;
+    public boolean showScoreboard; // Touche Tab pour afficher le tableau des joueurs
     public int mouseX, mouseY;
+
+    /**
+     * Désactive le focus traversal pour que Tab soit capturé
+     * Appeler cette méthode avec le composant principal (JFrame)
+     */
+    public static void disableFocusTraversal(Component component) {
+        component.setFocusTraversalKeysEnabled(false);
+        // Désactiver les touches de traversal
+        Set<AWTKeyStroke> emptySet = new HashSet<>();
+        component.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, emptySet);
+        component.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, emptySet);
+    }
 
     @Override
     public void keyPressed(KeyEvent e) {
@@ -28,6 +44,7 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
             case KeyEvent.VK_D                      -> strafeRight = down;
             case KeyEvent.VK_LEFT                   -> turnLeft = down;
             case KeyEvent.VK_RIGHT                  -> turnRight = down;
+            case KeyEvent.VK_TAB                    -> showScoreboard = down;
         }
     }
 
