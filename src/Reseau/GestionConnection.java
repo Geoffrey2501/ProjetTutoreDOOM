@@ -23,7 +23,7 @@ public class GestionConnection implements Runnable {
     private String remotePeerId;
 
     // Système de tick rate
-    private static final long TICK_INTERVAL_MS = 50; // 20 ticks/seconde
+    private static final long TICK_INTERVAL_MS = 16; // ~60 ticks/seconde
     private AtomicReference<String> pendingMoveMessage = new AtomicReference<>(null);
     private Thread tickThread;
     private volatile boolean running = true;

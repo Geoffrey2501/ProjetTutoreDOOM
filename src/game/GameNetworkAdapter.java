@@ -14,11 +14,6 @@ public class GameNetworkAdapter {
     private Map<String, Joueur> remotePlayers;
     private NetworkListener listener;
 
-    private static final long SEND_INTERVAL_MS = 50;
-    private long lastSendTime = 0;
-
-    private Map<String, Long> lastReceiveTime = new ConcurrentHashMap<>();
-    private static final long RECEIVE_MIN_INTERVAL_MS = 20;
 
     public GameNetworkAdapter(String nodeId, String host, int port) {
         this.serveur = new ServeurGame(nodeId, host, port, this);
@@ -44,20 +39,12 @@ public class GameNetworkAdapter {
 
     public void sendPlayerPosition() {
         if (localPlayer == null) return;
-
-        long now = System.currentTimeMillis();
-        if (now - lastSendTime < SEND_INTERVAL_MS) {
-            return;
-        }
-        lastSendTime = now;
-
         String message = "MOVE:" + localPlayer.getId() + ":" + localPlayer.toNetworkString();
         serveur.broadcastToPeers(message);
     }
 
     public void sendPlayerPositionNow() {
         if (localPlayer == null) return;
-        lastSendTime = System.currentTimeMillis();
         String message = "MOVE:" + localPlayer.getId() + ":" + localPlayer.toNetworkString();
         serveur.broadcastToPeers(message);
     }
@@ -72,13 +59,6 @@ public class GameNetworkAdapter {
         if (localPlayer != null && playerId.equals(localPlayer.getId())) {
             return;
         }
-
-        long now = System.currentTimeMillis();
-        Long lastTime = lastReceiveTime.get(playerId);
-        if (lastTime != null && (now - lastTime) < RECEIVE_MIN_INTERVAL_MS) {
-            return;
-        }
-        lastReceiveTime.put(playerId, now);
 
         boolean isNewPlayer = false;
         Joueur remotePlayer = remotePlayers.get(playerId);
@@ -106,7 +86,6 @@ public class GameNetworkAdapter {
 
     void onPlayerDisconnected(String playerId) {
         Joueur removed = remotePlayers.remove(playerId);
-        lastReceiveTime.remove(playerId);
         if (removed != null && listener != null) {
             listener.onPlayerLeave(playerId);
         }

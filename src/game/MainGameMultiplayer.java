@@ -26,11 +26,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     private static final String PLAYER_SPRITE_PATH = "src/prototype_raycasting/sprites/jonesy.png";
 
-    private long lastPositionSendTime = 0;
-    private static final long POSITION_SEND_INTERVAL_MS = 50;
-
-    private long lastPeriodicSendTime = 0;
-    private static final long PERIODIC_SEND_INTERVAL_MS = 1000;
 
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
         map = new prototype_raycasting.Map("src/prototype_raycasting/map/map.txt");
@@ -155,17 +150,10 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             }
         }
 
-        long now = System.currentTimeMillis();
-
-        if (moved && now - lastPositionSendTime >= POSITION_SEND_INTERVAL_MS) {
+        // Envoyer la position à chaque frame si le joueur a bougé
+        // Le tick rate dans GestionConnection (16ms) optimisera l'envoi automatiquement
+        if (moved) {
             network.sendPlayerPosition();
-            lastPositionSendTime = now;
-            lastPeriodicSendTime = now;
-        }
-
-        if (now - lastPeriodicSendTime >= PERIODIC_SEND_INTERVAL_MS) {
-            network.sendPlayerPositionNow();
-            lastPeriodicSendTime = now;
         }
 
         updateRemotePlayerSprites();
