@@ -353,48 +353,48 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        LOGGER.info("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
+        System.out.println("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
 
         // Afficher l'IP locale
         String localIP = getLocalIPAddress();
-        LOGGER.log(java.util.logging.Level.INFO, "Votre IP locale: {0}", localIP);
-        LOGGER.info("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
+        System.out.println("Votre IP locale: " + localIP);
+        System.out.println("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
 
-        LOGGER.info("Votre nom de joueur: ");
+        System.out.print("Votre nom de joueur: ");
         String playerId = scanner.nextLine().trim();
         if (playerId.isEmpty()) playerId = "Player" + System.currentTimeMillis() % 1000;
 
-        LOGGER.info("Votre port (ex: 5001): ");
+        System.out.print("Votre port (ex: 5001): ");
         int port = Integer.parseInt(scanner.nextLine().trim());
 
-        LOGGER.info("\n=== Mode Peer-to-Peer (Maillage complet) ===");
-        LOGGER.info("Vous pouvez vous connecter à un ou plusieurs joueurs.");
-        LOGGER.info("Le réseau se synchronisera automatiquement (tous connectés à tous).\n");
+        System.out.println("\n=== Mode Peer-to-Peer (Maillage complet) ===");
+        System.out.println("Vous pouvez vous connecter à un ou plusieurs joueurs.");
+        System.out.println("Le réseau se synchronisera automatiquement (tous connectés à tous).\n");
 
-        LOGGER.info("Voulez-vous rejoindre un joueur existant? (o/n): ");
+        System.out.print("Voulez-vous rejoindre un joueur existant? (o/n): ");
         String wantToConnect = scanner.nextLine().trim().toLowerCase();
 
         MainGameMultiplayer game;
 
         if (wantToConnect.equals("o") || wantToConnect.equals("oui")) {
-            LOGGER.info("IP du pair (ex: localhost ou 192.168.1.10): ");
+            System.out.print("IP du pair (ex: localhost ou 192.168.1.10): ");
             String peerIp = scanner.nextLine().trim();
 
-            LOGGER.info("Port du pair: ");
+            System.out.print("Port du pair: ");
             int peerPort = Integer.parseInt(scanner.nextLine().trim());
 
             game = new MainGameMultiplayer(playerId, port, peerIp, peerPort);
-            LOGGER.log(java.util.logging.Level.INFO, "\nConnexion au pair {0}:{1}", new Object[]{peerIp, peerPort});
-            LOGGER.info("Le maillage P2P va se former automatiquement...");
+            System.out.println("\nConnexion au pair " + peerIp + ":" + peerPort);
+            System.out.println("Le maillage P2P va se former automatiquement...");
         } else {
             game = new MainGameMultiplayer(playerId, port, null, 0);
-            LOGGER.log(java.util.logging.Level.INFO, "\nEn attente de connexions sur le port {0}", port);
-            LOGGER.info("Les autres joueurs peuvent se connecter à votre IP:port");
+            System.out.println("\nEn attente de connexions sur le port " + port);
+            System.out.println("Les autres joueurs peuvent se connecter à votre IP:port");
         }
 
-        LOGGER.info("\nDémarrage du jeu...");
-        LOGGER.info("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
-        LOGGER.info("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
+        System.out.println("\nDémarrage du jeu...");
+        System.out.println("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
+        System.out.println("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
 
         new Thread(game).start();
     }
