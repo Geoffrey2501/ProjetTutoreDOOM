@@ -40,9 +40,6 @@ public class P2PClient {
 
         // Créer le nœud client
         Serveur clientNode = new Serveur(playerName, "0.0.0.0", clientPort);
-        clientNode.start();
-        Thread.sleep(1000);
-
         System.out.println("\nClient démarré sur le port " + clientPort);
 
         // Se connecter au serveur

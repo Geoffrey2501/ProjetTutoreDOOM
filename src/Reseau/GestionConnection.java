@@ -6,25 +6,23 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Gère la connexion bidirectionnelle avec un autre pair dans le système P2P
- *
  * Cette classe implémente Runnable pour permettre une communication asynchrone.
  * Elle envoie et reçoit les messages de coordonnées (X, Y) des joueurs.
- *
  * Chaque connexion relaie les messages reçus au nœud local pour traitement.
  *
  * @author Groupe DOOM
  * @version 1.0
  */
 public class GestionConnection implements Runnable {
-    private Socket socket;
+    private final Socket socket;
     private PrintWriter out;
     private BufferedReader in;
-    private Serveur localNode;
+    private final Serveur localNode;
     private String remotePeerId;
 
     // Système de tick rate
     private static final long TICK_INTERVAL_MS = 16; // ~60 ticks/seconde
-    private AtomicReference<String> pendingMoveMessage = new AtomicReference<>(null);
+    private final AtomicReference<String> pendingMoveMessage = new AtomicReference<>(null);
     private Thread tickThread;
     private volatile boolean running = true;
 
@@ -70,7 +68,6 @@ public class GestionConnection implements Runnable {
 
     /**
      * Exécute la boucle de réception des messages du pair
-     *
      * Écoute continuellement le socket et traite les messages reçus.
      */
     @Override
@@ -81,7 +78,7 @@ public class GestionConnection implements Runnable {
                 localNode.processMessageFromPeer(message, this);
             }
         } catch (IOException e) {
-            //deconnexion
+            //déconnexion
         } finally {
             disconnect();
         }
@@ -89,7 +86,6 @@ public class GestionConnection implements Runnable {
 
     /**
      * Envoyer un message au pair avec tick rate
-     *
      * Format : "NomJoueur:X,Y"
      *
      * @param message Message à envoyer
@@ -109,7 +105,7 @@ public class GestionConnection implements Runnable {
     /**
      * Définir l'identifiant du pair distant
      *
-     * @param peerId Identifiant unique du pair (ex: "J1")
+     * @param peerId Identifiant unique du pair (ex : "J1")
      */
     public void setRemotePeerId(String peerId) {
         this.remotePeerId = peerId;
@@ -117,7 +113,6 @@ public class GestionConnection implements Runnable {
 
     /**
      * Fermer la connexion avec le pair
-     *
      * Ferme le socket et notifie le nœud local de la déconnexion.
      */
     public void disconnect() {
@@ -129,6 +124,7 @@ public class GestionConnection implements Runnable {
             socket.close();
             localNode.removePeer(this);
         } catch (IOException e) {
+            System.err.println("Error closing socket : " + e.getMessage());
         }
     }
 

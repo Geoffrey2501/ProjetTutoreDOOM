@@ -7,14 +7,12 @@ import java.util.concurrent.*;
 
 /**
  * Nœud Peer-to-Peer (P2P) pour le système multijoueur Doom-like avec maillage complet
- *
  * Chaque nœud agit à la fois comme client et serveur. Il peut :
  * - Accepter les connexions entrantes d'autres joueurs
  * - Se connecter à d'autres joueurs
  * - Partager la liste des pairs connus avec les nouveaux connectés (maillage complet)
  * - Envoyer ses coordonnées (X, Y) à tous les pairs
  * - Recevoir et relayer les coordonnées des autres joueurs
- *
  * Protocole des messages :
  * - "MOVE:NomJoueur:X,Y" - Coordonnées d'un joueur
  * - "PEER_LIST:J1@host1:port1;J2@host2:port2" - Liste des pairs connus
@@ -25,14 +23,14 @@ import java.util.concurrent.*;
  */
 public class Serveur {
 
-    private String nodeId;
-    private int port;
-    private String host;
+    private final String nodeId;
+    private final int port;
+    private final String host;
     private ServerSocket serverSocket;
     protected List<GestionConnection> connectedPeers = new CopyOnWriteArrayList<>();
-    private Map<String, PeerInfo> knownPeers = new ConcurrentHashMap<>();
-    private ExecutorService executor = Executors.newCachedThreadPool();
-    private Map<String, int[]> playerPositions = new ConcurrentHashMap<>();
+    private final Map<String, PeerInfo> knownPeers = new ConcurrentHashMap<>();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final Map<String, int[]> playerPositions = new ConcurrentHashMap<>();
     private int posX = 0;
     private int posY = 0;
 
@@ -263,8 +261,6 @@ public class Serveur {
 
                 // Envoyer la liste des pairs connus pour établir le maillage complet
                 sendPeerListTo(sender);
-
-                onPeerConnected(playerId);
             }
 
             int x = Integer.parseInt(coords[0].trim().split("\\.")[0]); //gérer les doubles
@@ -414,13 +410,6 @@ public class Serveur {
         // Par défaut, ne fait rien - à surcharger dans les sous-classes
     }
 
-    /**
-     * Callback appelé quand un nouveau pair est connecté et identifié
-     * Peut être surchargé par les sous-classes
-     */
-    protected void onPeerConnected(String peerId) {
-        // Par défaut, ne fait rien - à surcharger dans les sous-classes
-    }
 
     /**
      * Obtenir la liste des positions de tous les joueurs
