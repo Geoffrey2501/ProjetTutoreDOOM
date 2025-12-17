@@ -13,9 +13,18 @@ public class Map {
     private boolean[][] grid; // 1 = mur | 0 = vide
 
     public Map () {
-        this.width = 0;
-        this.height = 0;
-        this.grid = new boolean[0][0];
+        width = 10;
+        height = 10;
+        grid = new boolean[height][width];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (y == 0 || y == height - 1 || x == 0 || x == width - 1) {
+                    grid[y][x] = true; // mur
+                } else {
+                    grid[y][x] = false; // vide
+                }
+            }
+        }
     }
 
     public Map(String fichier) {
