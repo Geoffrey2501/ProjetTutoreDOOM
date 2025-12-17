@@ -26,7 +26,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private final int FPS = 60;
     private final long OPTIMAL_TIME = 1_000_000_000 / FPS;
 
-    private static final String PLAYER_SPRITE_PATH = "src/prototype_raycasting/sprites/jonesy.png";
+    private static final String PLAYER_SPRITE_PATH = "assets/sprites/jonesy.png";
 
 
     private boolean mouseCaptured = true;
@@ -37,7 +37,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private final Point centerPoint;
 
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
-        map = new prototype_raycasting.Map("src/prototype_raycasting/map/map.txt");
+        map = new prototype_raycasting.Map("assets/maps/map.txt");
         joueur = new Joueur(playerId, 2.0, 2.0, 0.0);
         input = new Input();
         playerSprites = new ConcurrentHashMap<>();

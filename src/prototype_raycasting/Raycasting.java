@@ -179,7 +179,7 @@ public class Raycasting extends JFrame {
      */
     private void loadWallTexture() {
         try {
-            File textureFile = new File("assets/wall.png");
+            File textureFile = new File("assets/textures/wall.jpg");
             if (textureFile.exists()) {
                 BufferedImage loaded = ImageIO.read(textureFile);
                 // Convertir en TYPE_INT_ARGB pour accès rapide aux pixels
@@ -358,41 +358,40 @@ public class Raycasting extends JFrame {
             int x2 = ((i + 1) * screenWidth) / numRays;
             int rayWidth = x2 - x1;
 
-            //calculer la coordonnée X de la texture (wallX)
-            double wallX;
+            // calculer la coordonnée Y de la texture
+            double wallY;
             if (!side) {
-                wallX = joueurY + perpWallDist * rayDirY;
+                wallY = joueurY + perpWallDist * rayDirY;
             } else {
-                wallX = joueurX + perpWallDist * rayDirX;
+                wallY = joueurX + perpWallDist * rayDirX;
             }
-            wallX -= Math.floor(wallX); // Garder uniquement la partie décimale
+            wallY -= Math.floor(wallY); // Garder uniquement la partie décimale
 
-            //calculer la coordonnée X dans la texture
-            int texX = (int)(wallX * texWidth);
+            // calculer la coordonnée Y dans la texture
+            int texY = (int)(wallY * texHeight);
             if ((!side && rayDirX > 0) || (side && rayDirY < 0)) {
-                texX = texWidth - texX - 1;
+                texY = texHeight - texY - 1;
             }
-            texX = Math.max(0, Math.min(texWidth - 1, texX));
+            texY = Math.max(0, Math.min(texHeight - 1, texY));
+
 
             //dessiner les colonnes du mur
             for (int screenX = x1; screenX < x2 && screenX < screenWidth; screenX++) {
                 zBuffer[screenX] = perpWallDist;
 
                 if (wallTexturePixels != null) {
-                    //avec texture - dessiner pixel par pixel
                     for (int y = drawStart; y <= drawEnd; y++) {
-                        //calculer la position relative dans le mur (0.0 à 1.0)
-                        //d = position verticale relative au mur entier
+                        // calculer la position relative dans le mur (0.0 à 1.0)
                         double d = (double)(y - drawStartRaw) / (double)(drawEndRaw - drawStartRaw);
 
-                        //convertir en coordonnée de texture
-                        int texY = (int)(d * texHeight);
-                        if (texY < 0) texY = 0;
-                        if (texY >= texHeight) texY = texHeight - 1;
+                        // convertir en coordonnée de texture
+                        int texX = (int)(d * texWidth);
+                        if (texX < 0) texX = 0;
+                        if (texX >= texWidth) texX = texWidth - 1;
 
                         int color = wallTexturePixels[texY * texWidth + texX];
 
-                        //assombrir les côtés Y
+                        // assombrir les côtés Y
                         if (side) {
                             int r = ((color >> 16) & 0xFF) >> 1;
                             int gCol = ((color >> 8) & 0xFF) >> 1;
