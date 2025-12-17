@@ -115,19 +115,19 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         double dy = 0;
         boolean moved = false;
 
-        if (input.forward) {
+        if (input.isForward()) {
             dx += cos;
             dy += sin;
         }
-        if (input.backward) {
+        if (input.isBackward()) {
             dx -= cos;
             dy -= sin;
         }
-        if (input.strafeLeft) {
+        if (input.isStrafeLeft()) {
             dx += sin;
             dy -= cos;
         }
-        if (input.strafeRight) {
+        if (input.isStrafeRight()) {
             dx -= sin;
             dy += cos;
         }
@@ -150,10 +150,10 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             }
         }
 
-        if (input.turnLeft) {
+        if (input.isTurnLeft()) {
             joueur.setAngle(angle - rotSpeed);
             moved = true;
-        } else if (input.turnRight) {
+        } else if (input.isTurnRight()) {
             joueur.setAngle(angle + rotSpeed);
             moved = true;
         }
@@ -164,7 +164,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             int centerX = width / 2;
             int centerY = height / 2;
 
-            int deltaX = input.mouseX - centerX;
+            int deltaX = input.getMouseX() - centerX;
 
             if (deltaX != 0) {
                 joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
@@ -174,8 +174,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
                 SwingUtilities.convertPointToScreen(centerPoint, raycasting);
                 robot.mouseMove(centerPoint.x, centerPoint.y);
 
-                input.mouseX = centerX;
-                input.mouseY = centerY;
+                input.setMouseX(centerX);
+                input.setMouseY(centerY);
             }
         }
 
@@ -184,8 +184,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         }
 
         // Gestion du scoreboard (touche Tab)
-        raycasting.setShowScoreboard(input.showScoreboard);
-        if (input.showScoreboard) {
+        raycasting.setShowScoreboard(input.isShowScoreboard());
+        if (input.isShowScoreboard()) {
             List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
             raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
         }
@@ -194,7 +194,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     }
 
     private void handleMouseCaptureState() {
-        if (input.escape) {
+        if (input.isEscape()) {
             if (!escapePressed) {
                 escapePressed = true;
                 toggleMouseCapture(!mouseCaptured);
@@ -203,9 +203,9 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             escapePressed = false;
         }
 
-        if (!mouseCaptured && input.mouseLeftClicked) {
+        if (!mouseCaptured && input.isMouseLeftClicked()) {
             toggleMouseCapture(true);
-            input.mouseLeftClicked = false;
+            input.resetMouseLeftClicked();
         }
     }
 
@@ -224,8 +224,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             centerPoint.setLocation(raycasting.getWidth() / 2, raycasting.getHeight() / 2);
             SwingUtilities.convertPointToScreen(centerPoint, raycasting);
             robot.mouseMove(centerPoint.x, centerPoint.y);
-            input.mouseX = raycasting.getWidth() / 2;
-            input.mouseY = raycasting.getHeight() / 2;
+            input.setMouseX(raycasting.getWidth() / 2);
+            input.setMouseY(raycasting.getHeight() / 2);
         }
     }
 

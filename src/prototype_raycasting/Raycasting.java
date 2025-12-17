@@ -223,9 +223,9 @@ public class Raycasting extends JFrame {
         //on code le raycasting ici
         //on utilise DDA pour trouver les murs
 
-        boolean[][] mapData = map.getMap();
+        boolean[][] mapData = map.getGrid();
         int mapWidth = map.getWIDTH();
-        int mapHeight = map.getHEIGHT();
+        int mapHeight = map.getHeight();
 
         double joueurX = joueur.getX();
         double joueurY = joueur.getY();
