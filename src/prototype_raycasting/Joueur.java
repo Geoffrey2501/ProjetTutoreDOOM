@@ -1,10 +1,13 @@
 package prototype_raycasting;
 
+import java.util.logging.Logger;
+
 /**
  * Classe représentant un joueur dans le jeu Doom-like
  * Supporte la synchronisation réseau pour le multijoueur
  */
 public class Joueur {
+    private static final Logger LOGGER = Logger.getLogger(Joueur.class.getName());
     private String id;  // Identifiant unique du joueur pour le réseau
     private double x;
     private double y;
@@ -123,7 +126,7 @@ public class Joueur {
                 return true;
             }
         } catch (NumberFormatException e) {
-            System.err.println("Erreur parsing position joueur: " + data + " - " + e.getMessage());
+            LOGGER.warning("Erreur parsing position joueur: " + data + " - " + e.getMessage());
         }
         return false;
     }
