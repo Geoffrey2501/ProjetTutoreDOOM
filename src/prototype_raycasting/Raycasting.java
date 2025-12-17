@@ -24,10 +24,10 @@ public class Raycasting extends JFrame {
     private boolean render;
     private Map map;
     private Joueur joueur;
-    private int FOV = 60;
-    private int NUM_RAYS = 1000;
+    private static final int FOV = 60;
+    private static final int NUM_RAYS = 1000;
 
-    private List<Sprite> sprites = new CopyOnWriteArrayList<>();
+    private final transient List<Sprite> sprites = new CopyOnWriteArrayList<>();
     private double[] zBuffer;
 
     // Texture du mur
@@ -42,14 +42,33 @@ public class Raycasting extends JFrame {
     private int lastScreenHeight = 0;
 
     // Logs à afficher en haut à gauche
-    private List<LogMessage> logMessages = new CopyOnWriteArrayList<>();
+    private final transient List<LogMessage> logMessages = new CopyOnWriteArrayList<>();
     private static final int MAX_LOGS = 5;
     private static final long LOG_DURATION_MS = 5000; // 5 secondes
 
     // Scoreboard (tableau des joueurs)
     private boolean showScoreboard = false;
-    private List<String> playerList = new CopyOnWriteArrayList<>();
+    private final List<String> playerList = new CopyOnWriteArrayList<>();
     private String localPlayerName = "";
+
+    // Constante pour la police
+    private static final String FONT_ARIAL = "Arial";
+
+    // Couleurs constantes pour le rendu
+    private static final int SKY_COLOR = new Color(135, 206, 235).getRGB();
+    private static final int FLOOR_COLOR = new Color(105, 105, 105).getRGB();
+    private static final int WALL_COLOR_LIGHT = new Color(200, 100, 0).getRGB();
+    private static final int WALL_COLOR_DARK = new Color(150, 75, 0).getRGB();
+
+    // Classe interne pour stocker les résultats du DDA
+    private static class RayResult {
+        double perpWallDist;
+        boolean side;
+        int stepX;
+        int stepY;
+        double rayDirX;
+        double rayDirY;
+    }
 
     // Palette de couleurs pour les joueurs distants
     private static final Color[] PLAYER_COLORS = {
@@ -71,7 +90,7 @@ public class Raycasting extends JFrame {
             return new Color(0, 200, 0); // Vert pour le joueur local
         }
         // Utiliser le hashcode du nom pour avoir une couleur cohérente
-        int colorIndex = Math.abs(playerName.hashCode()) % PLAYER_COLORS.length;
+        int colorIndex = (playerName.hashCode() & 0x7FFFFFFF) % PLAYER_COLORS.length;
         return PLAYER_COLORS[colorIndex];
     }
 
@@ -127,6 +146,7 @@ public class Raycasting extends JFrame {
         add(panelDessin);
 
         WindowListener l = new WindowAdapter() {
+            @Override
             public void windowClosing(WindowEvent e){
                 System.exit(0);
             }
@@ -221,301 +241,323 @@ public class Raycasting extends JFrame {
     }
 
     private void dessiner(Graphics g) {
-        //on code le raycasting ici
-        //on utilise DDA pour trouver les murs
-
-        boolean[][] mapData = map.getGrid();
-        int mapWidth = map.getWIDTH();
-        int mapHeight = map.getHeight();
-
-        double joueurX = joueur.getX();
-        double joueurY = joueur.getY();
-        double joueurAngle = joueur.getAngle();
-
         int screenWidth = panelDessin.getWidth();
         int screenHeight = panelDessin.getHeight();
 
         if (screenWidth <= 0 || screenHeight <= 0) return;
 
-        // Initialiser le buffer
+        // Initialiser les buffers
         initScreenBuffer(screenWidth, screenHeight);
-
-        // Initialiser le z-buffer
         zBuffer = new double[screenWidth];
 
-        // Couleurs pour le ciel et le sol
-        int skyColor = new Color(135, 206, 235).getRGB();
-        int floorColor = new Color(105, 105, 105).getRGB();
+        // Dessiner le fond (ciel et sol)
+        dessinerFond(screenWidth, screenHeight);
 
-        // Remplir le ciel et le sol dans le buffer
-        int halfHeight = screenHeight / 2;
-        for (int y = 0; y < screenHeight; y++) {
-            int color = (y < halfHeight) ? skyColor : floorColor;
-            int rowStart = y * screenWidth;
-            for (int x = 0; x < screenWidth; x++) {
-                screenPixels[rowStart + x] = color;
-            }
-        }
+        // Lancer les rayons et dessiner les murs
+        double fov = Math.toRadians(FOV);
+        lancerRayons(screenWidth, screenHeight, fov);
 
-        //FOV (champ de vision) en radians - utilise le parametre FOV
-        double fov = Math.toRadians(FOV); // Conversion des degrés en radians
-        int numRays = NUM_RAYS; // Utilise le parametre NUM_RAYS
-
-        // Couleurs par défaut pour les murs (sans texture)
-        int wallColorLight = new Color(200, 100, 0).getRGB();
-        int wallColorDark = new Color(150, 75, 0).getRGB();
-
-        //lancer les rayons
-        for (int i = 0; i < numRays; i++) {
-            //calculer l'angle du rayon
-            double rayAngle = joueurAngle - fov / 2 + (fov * i / numRays);
-
-            //direction du rayon
-            double rayDirX = Math.cos(rayAngle);
-            double rayDirY = Math.sin(rayAngle);
-
-            //DDA Algorithm
-            double deltaDistX = Math.abs(1 / rayDirX);
-            double deltaDistY = Math.abs(1 / rayDirY);
-
-            int mapX = (int) joueurX;
-            int mapY = (int) joueurY;
-
-            double sideDistX, sideDistY;
-            int stepX, stepY;
-
-            //determiner la direction du pas et la distance initiale
-            if (rayDirX < 0) {
-                stepX = -1;
-                sideDistX = (joueurX - mapX) * deltaDistX;
-            } else {
-                stepX = 1;
-                sideDistX = (mapX + 1.0 - joueurX) * deltaDistX;
-            }
-
-            if (rayDirY < 0) {
-                stepY = -1;
-                sideDistY = (joueurY - mapY) * deltaDistY;
-            } else {
-                stepY = 1;
-                sideDistY = (mapY + 1.0 - joueurY) * deltaDistY;
-            }
-
-            //effectuer le DDA
-            boolean hit = false;
-            boolean side = false; //false = cote X, true = cote Y
-
-            while (!hit) {
-                //avancer d'une case
-                if (sideDistX < sideDistY) {
-                    sideDistX += deltaDistX;
-                    mapX += stepX;
-                    side = false;
-                } else {
-                    sideDistY += deltaDistY;
-                    mapY += stepY;
-                    side = true;
-                }
-
-                //verifier si on a touche un mur
-                if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight) {
-                    hit = true;
-                } else if (mapData[mapY][mapX]) {
-                    hit = true;
-                }
-            }
-
-            //calculer la distance perpendiculaire au mur (pour éviter l'effet fish-eye)
-            double perpWallDist;
-            if (!side) {
-                perpWallDist = (mapX - joueurX + (1 - stepX) / 2.0) / rayDirX;
-            } else {
-                perpWallDist = (mapY - joueurY + (1 - stepY) / 2.0) / rayDirY;
-            }
-
-            // Calculer la hauteur du mur à l'écran
-            int lineHeight;
-            if (perpWallDist > 0) {
-                lineHeight = (int) (screenHeight / perpWallDist);
-            } else {
-                lineHeight = screenHeight;
-            }
-
-            //calculer les positions de début et fin du mur (valeurs non clampées pour le calcul de texture)
-            int drawStartRaw = -lineHeight / 2 + screenHeight / 2;
-            int drawEndRaw = lineHeight / 2 + screenHeight / 2;
-
-            // Valeurs clampées pour le dessin réel
-            int drawStart = Math.max(0, drawStartRaw);
-            int drawEnd = Math.min(screenHeight - 1, drawEndRaw);
-
-
-            //calculer la position et largeur de chaque colonne pour éviter les gaps
-            int x1 = (i * screenWidth) / numRays;
-            int x2 = ((i + 1) * screenWidth) / numRays;
-            int rayWidth = x2 - x1;
-
-            // calculer la coordonnée Y de la texture
-            double wallY;
-            if (!side) {
-                wallY = joueurY + perpWallDist * rayDirY;
-            } else {
-                wallY = joueurX + perpWallDist * rayDirX;
-            }
-            wallY -= Math.floor(wallY); // Garder uniquement la partie décimale
-
-            // calculer la coordonnée Y dans la texture
-            int texY = (int)(wallY * texHeight);
-            if ((!side && rayDirX > 0) || (side && rayDirY < 0)) {
-                texY = texHeight - texY - 1;
-            }
-            texY = Math.clamp(texY, 0, texHeight - 1);
-
-
-            //dessiner les colonnes du mur
-            for (int screenX = x1; screenX < x2 && screenX < screenWidth; screenX++) {
-                zBuffer[screenX] = perpWallDist;
-
-                if (wallTexturePixels != null) {
-                    for (int y = drawStart; y <= drawEnd; y++) {
-                        // calculer la position relative dans le mur (0.0 à 1.0)
-                        double d = (double)(y - drawStartRaw) / (double)(drawEndRaw - drawStartRaw);
-
-                        // convertir en coordonnée de texture
-                        int texX = Math.clamp((int)(d * texWidth), 0, texWidth - 1);
-
-                        int color = wallTexturePixels[texY * texWidth + texX];
-
-                        // assombrir les côtés Y
-                        if (side) {
-                            int r = ((color >> 16) & 0xFF) >> 1;
-                            int gCol = ((color >> 8) & 0xFF) >> 1;
-                            int b = (color & 0xFF) >> 1;
-                            color = (0xFF << 24) | (r << 16) | (gCol << 8) | b;
-                        }
-
-                        screenPixels[y * screenWidth + screenX] = color;
-                    }
-                } else {
-                    //sans texture
-                    int color = side ? wallColorDark : wallColorLight;
-
-                    for (int y = drawStart; y <= drawEnd; y++) {
-                        screenPixels[y * screenWidth + screenX] = color;
-                    }
-                }
-            }
-        }
-
-        //dessiner le buffer à l'écran
+        // Dessiner le buffer à l'écran
         g.drawImage(screenBuffer, 0, 0, null);
 
-        //dessiner les sprites (utilise Graphics classique car plus complexe)
-        dessinerSprites(g, screenWidth, screenHeight, joueurX, joueurY, joueurAngle, fov);
+        // Dessiner les sprites
+        dessinerSprites(g, screenWidth, screenHeight, joueur.getX(), joueur.getY(), joueur.getAngle(), fov);
 
-        //dessiner les logs en haut à gauche
+        // Dessiner les logs et le scoreboard
         dessinerLogs(g);
-
-        //dessiner le scoreboard si Tab est pressé
         if (showScoreboard) {
             dessinerScoreboard(g, screenWidth, screenHeight);
         }
     }
 
+    /**
+     * Dessiner le fond (ciel en haut, sol en bas)
+     */
+    private void dessinerFond(int screenWidth, int screenHeight) {
+        int halfHeight = screenHeight / 2;
+        for (int y = 0; y < screenHeight; y++) {
+            int color = (y < halfHeight) ? SKY_COLOR : FLOOR_COLOR;
+            int rowStart = y * screenWidth;
+            for (int x = 0; x < screenWidth; x++) {
+                screenPixels[rowStart + x] = color;
+            }
+        }
+    }
+
+    /**
+     * Lancer tous les rayons et dessiner les murs
+     */
+    private void lancerRayons(int screenWidth, int screenHeight, double fov) {
+        double joueurX = joueur.getX();
+        double joueurY = joueur.getY();
+        double joueurAngle = joueur.getAngle();
+
+        for (int i = 0; i < NUM_RAYS; i++) {
+            double rayAngle = joueurAngle - fov / 2 + (fov * i / NUM_RAYS);
+            RayResult result = executerDDA(rayAngle, joueurX, joueurY);
+            dessinerColonneMur(i, screenWidth, screenHeight, result, joueurX, joueurY);
+        }
+    }
+
+    /**
+     * Exécuter l'algorithme DDA pour un rayon
+     */
+    private RayResult executerDDA(double rayAngle, double joueurX, double joueurY) {
+        boolean[][] mapData = map.getGrid();
+        int mapWidth = map.getWIDTH();
+        int mapHeight = map.getHeight();
+
+        RayResult result = new RayResult();
+        result.rayDirX = Math.cos(rayAngle);
+        result.rayDirY = Math.sin(rayAngle);
+
+        double deltaDistX = Math.abs(1 / result.rayDirX);
+        double deltaDistY = Math.abs(1 / result.rayDirY);
+
+        int mapX = (int) joueurX;
+        int mapY = (int) joueurY;
+
+        double sideDistX = calculerSideDistX(result, joueurX, mapX, deltaDistX);
+        double sideDistY = calculerSideDistY(result, joueurY, mapY, deltaDistY);
+
+        // Effectuer le DDA
+        boolean hit = false;
+        while (!hit) {
+            if (sideDistX < sideDistY) {
+                sideDistX += deltaDistX;
+                mapX += result.stepX;
+                result.side = false;
+            } else {
+                sideDistY += deltaDistY;
+                mapY += result.stepY;
+                result.side = true;
+            }
+
+            hit = isHit(mapX, mapY, mapWidth, mapHeight, mapData);
+        }
+
+        // Calculer la distance perpendiculaire
+        result.perpWallDist = calculerPerpWallDist(result, mapX, mapY, joueurX, joueurY);
+        return result;
+    }
+
+    private double calculerSideDistX(RayResult result, double joueurX, int mapX, double deltaDistX) {
+        if (result.rayDirX < 0) {
+            result.stepX = -1;
+            return (joueurX - mapX) * deltaDistX;
+        } else {
+            result.stepX = 1;
+            return (mapX + 1.0 - joueurX) * deltaDistX;
+        }
+    }
+
+    private double calculerSideDistY(RayResult result, double joueurY, int mapY, double deltaDistY) {
+        if (result.rayDirY < 0) {
+            result.stepY = -1;
+            return (joueurY - mapY) * deltaDistY;
+        } else {
+            result.stepY = 1;
+            return (mapY + 1.0 - joueurY) * deltaDistY;
+        }
+    }
+
+    private boolean isHit(int mapX, int mapY, int mapWidth, int mapHeight, boolean[][] mapData) {
+        if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight) {
+            return true;
+        }
+        return mapData[mapY][mapX];
+    }
+
+    private double calculerPerpWallDist(RayResult result, int mapX, int mapY, double joueurX, double joueurY) {
+        if (!result.side) {
+            return (mapX - joueurX + (1 - result.stepX) / 2.0) / result.rayDirX;
+        } else {
+            return (mapY - joueurY + (1 - result.stepY) / 2.0) / result.rayDirY;
+        }
+    }
+
+    /**
+     * Dessiner une colonne de mur pour un rayon
+     */
+    private void dessinerColonneMur(int rayIndex, int screenWidth, int screenHeight, RayResult result,
+                                     double joueurX, double joueurY) {
+        int lineHeight = (result.perpWallDist > 0) ? (int) (screenHeight / result.perpWallDist) : screenHeight;
+
+        int drawStartRaw = -lineHeight / 2 + screenHeight / 2;
+        int drawEndRaw = lineHeight / 2 + screenHeight / 2;
+        int drawStart = Math.max(0, drawStartRaw);
+        int drawEnd = Math.min(screenHeight - 1, drawEndRaw);
+
+        int x1 = (rayIndex * screenWidth) / NUM_RAYS;
+        int x2 = ((rayIndex + 1) * screenWidth) / NUM_RAYS;
+
+        int texY = calculerTexY(result, joueurX, joueurY);
+
+        for (int screenX = x1; screenX < x2 && screenX < screenWidth; screenX++) {
+            zBuffer[screenX] = result.perpWallDist;
+            dessinerPixelsColonne(screenX, screenWidth, drawStart, drawEnd, drawStartRaw, drawEndRaw, texY, result.side);
+        }
+    }
+
+    private int calculerTexY(RayResult result, double joueurX, double joueurY) {
+        double wallY = result.side
+            ? joueurX + result.perpWallDist * result.rayDirX
+            : joueurY + result.perpWallDist * result.rayDirY;
+        wallY -= Math.floor(wallY);
+
+        int texY = (int) (wallY * texHeight);
+        if ((!result.side && result.rayDirX > 0) || (result.side && result.rayDirY < 0)) {
+            texY = texHeight - texY - 1;
+        }
+        return Math.clamp(texY, 0, texHeight - 1);
+    }
+
+    private void dessinerPixelsColonne(int screenX, int screenWidth, int drawStart, int drawEnd,
+                                        int drawStartRaw, int drawEndRaw, int texY, boolean side) {
+        if (wallTexturePixels != null) {
+            dessinerColonneTexturee(screenX, screenWidth, drawStart, drawEnd, drawStartRaw, drawEndRaw, texY, side);
+        } else {
+            dessinerColonneCouleur(screenX, screenWidth, drawStart, drawEnd, side);
+        }
+    }
+
+    private void dessinerColonneTexturee(int screenX, int screenWidth, int drawStart, int drawEnd,
+                                          int drawStartRaw, int drawEndRaw, int texY, boolean side) {
+        for (int y = drawStart; y <= drawEnd; y++) {
+            double d = (double) (y - drawStartRaw) / (double) (drawEndRaw - drawStartRaw);
+            int texX = Math.clamp((int) (d * texWidth), 0, texWidth - 1);
+            int color = wallTexturePixels[texY * texWidth + texX];
+
+            if (side) {
+                color = assombrirCouleur(color);
+            }
+            screenPixels[y * screenWidth + screenX] = color;
+        }
+    }
+
+    private void dessinerColonneCouleur(int screenX, int screenWidth, int drawStart, int drawEnd, boolean side) {
+        int color = side ? WALL_COLOR_DARK : WALL_COLOR_LIGHT;
+        for (int y = drawStart; y <= drawEnd; y++) {
+            screenPixels[y * screenWidth + screenX] = color;
+        }
+    }
+
+    private int assombrirCouleur(int color) {
+        int r = ((color >> 16) & 0xFF) >> 1;
+        int g = ((color >> 8) & 0xFF) >> 1;
+        int b = (color & 0xFF) >> 1;
+        return (0xFF << 24) | (r << 16) | (g << 8) | b;
+    }
+
     private void dessinerSprites(Graphics g, int screenWidth, int screenHeight,
                                   double joueurX, double joueurY, double joueurAngle, double fov) {
 
+        List<Sprite> sortedSprites = trierSpritesParDistance(joueurX, joueurY);
+        Graphics2D g2d = (Graphics2D) g;
+
+        for (Sprite sprite : sortedSprites) {
+            dessinerUnSprite(g2d, sprite, screenWidth, screenHeight, joueurX, joueurY, joueurAngle, fov);
+        }
+    }
+
+    private List<Sprite> trierSpritesParDistance(double joueurX, double joueurY) {
         List<Sprite> sortedSprites = new ArrayList<>(sprites);
         sortedSprites.sort((a, b) -> {
             double distA = (a.getX() - joueurX) * (a.getX() - joueurX) + (a.getY() - joueurY) * (a.getY() - joueurY);
             double distB = (b.getX() - joueurX) * (b.getX() - joueurX) + (b.getY() - joueurY) * (b.getY() - joueurY);
             return Double.compare(distB, distA);
         });
+        return sortedSprites;
+    }
 
-        Graphics2D g2d = (Graphics2D) g;
+    private void dessinerUnSprite(Graphics2D g2d, Sprite sprite, int screenWidth, int screenHeight,
+                                   double joueurX, double joueurY, double joueurAngle, double fov) {
+        //position relative du sprite par rapport au joueur
+        double spriteX = sprite.getX() - joueurX;
+        double spriteY = sprite.getY() - joueurY;
 
-        for (Sprite sprite : sortedSprites) {
-            //position relative du sprite par rapport au joueur
-            double spriteX = sprite.getX() - joueurX;
-            double spriteY = sprite.getY() - joueurY;
+        //calculer l'angle vers le sprite
+        double angleDiff = normaliserAngle(Math.atan2(spriteY, spriteX) - joueurAngle);
 
-            //calculer l'angle vers le sprite
-            double spriteAngle = Math.atan2(spriteY, spriteX);
-            double angleDiff = spriteAngle - joueurAngle;
+        //verifier si le sprite est dans le FOV
+        if (Math.abs(angleDiff) > fov / 2 + 0.2) return;
 
-            //normaliser l'angle entre -PI et PI
-            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+        //distance au sprite
+        double spriteDistance = Math.sqrt(spriteX * spriteX + spriteY * spriteY);
+        if (spriteDistance < 0.1) return; // Trop proche
 
-            //verifier si le sprite est dans le FOV
-            if (Math.abs(angleDiff) > fov / 2 + 0.2) continue;
+        //position X sur l'ecran
+        int spriteScreenX = (int) ((0.5 + angleDiff / fov) * screenWidth);
 
-            //distance au sprite
-            double spriteDistance = Math.sqrt(spriteX * spriteX + spriteY * spriteY);
-            if (spriteDistance < 0.1) continue; // Trop proche
+        //taille du sprite à l'ecran (carré)
+        int spriteSize = (int) (screenHeight / spriteDistance);
 
-            //position X sur l'ecran
-            int spriteScreenX = (int) ((0.5 + angleDiff / fov) * screenWidth);
+        int drawStartY = screenHeight / 2 - spriteSize / 2;
+        int drawStartX = spriteScreenX - spriteSize / 2;
+        int drawEndX = spriteScreenX + spriteSize / 2;
 
-            //taille du sprite à l'ecran
-            int spriteHeight = (int) (screenHeight / spriteDistance);
-            int spriteWidth = spriteHeight; // Sprite carré
+        //verifier si au moins une partie du sprite est visible (devant les murs)
+        if (!isSpriteVisible(spriteDistance, drawStartX, drawEndX, screenWidth)) return;
 
-            int drawStartY = screenHeight / 2 - spriteHeight / 2;
-            int drawStartX = spriteScreenX - spriteWidth / 2;
-            int drawEndX = spriteScreenX + spriteWidth / 2;
+        //dessiner le sprite avec clipping par colonne
+        dessinerSpriteImage(g2d, sprite, spriteDistance, spriteSize, drawStartX, drawStartY, drawEndX, screenWidth);
 
-            //verifier si au moins une partie du sprite est visible (devant les murs)
-            boolean visible = false;
-            for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
-                if (spriteDistance < zBuffer[stripe]) {
-                    visible = true;
-                    break;
-                }
+        //dessiner le pseudo au-dessus du sprite
+        dessinerPseudo(g2d, sprite.getPlayerName(), spriteScreenX, drawStartY);
+    }
+
+    private double normaliserAngle(double angle) {
+        while (angle > Math.PI) angle -= 2 * Math.PI;
+        while (angle < -Math.PI) angle += 2 * Math.PI;
+        return angle;
+    }
+
+    private boolean isSpriteVisible(double spriteDistance, int drawStartX, int drawEndX, int screenWidth) {
+        for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
+            if (spriteDistance < zBuffer[stripe]) {
+                return true;
             }
-            if (!visible) continue;
+        }
+        return false;
+    }
 
-            //dessiner le sprite avec clipping par colonne
-            //on dessine colonne par colonne mais avec drawImage (beaucoup plus rapide)
-            BufferedImage spriteImage = sprite.getImage();
-            int imgWidth = spriteImage.getWidth();
-            int imgHeight = spriteImage.getHeight();
+    private void dessinerSpriteImage(Graphics2D g2d, Sprite sprite, double spriteDistance,
+                                      int spriteSize, int drawStartX, int drawStartY, int drawEndX, int screenWidth) {
+        BufferedImage spriteImage = sprite.getImage();
+        int imgWidth = spriteImage.getWidth();
+        int imgHeight = spriteImage.getHeight();
 
-            for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
-                //verifier le z-buffer
-                if (spriteDistance < zBuffer[stripe]) {
-                    //calculer quelle colonne de texture dessiner
-                    int texX = (stripe - drawStartX) * imgWidth / spriteWidth;
-                    if (texX < 0 || texX >= imgWidth) continue;
-
-                    //dessiner cette colonne du sprite
+        for (int stripe = Math.max(0, drawStartX); stripe < Math.min(screenWidth, drawEndX); stripe++) {
+            if (spriteDistance < zBuffer[stripe]) {
+                int texX = (stripe - drawStartX) * imgWidth / spriteSize;
+                if (texX >= 0 && texX < imgWidth) {
                     g2d.drawImage(spriteImage,
-                            stripe, drawStartY,           //destination top-left
-                            stripe + 1, drawStartY + spriteHeight, //destination bottom-right
-                            texX, 0,                      //source top-left
-                            texX + 1, imgHeight,          //source bottom-right
+                            stripe, drawStartY,
+                            stripe + 1, drawStartY + spriteSize,
+                            texX, 0,
+                            texX + 1, imgHeight,
                             null);
                 }
             }
-
-            //dessiner le pseudo au dessus du sprite
-            String playerName = sprite.getPlayerName();
-            if (playerName != null && !playerName.isEmpty()) {
-                String displayName = truncateName(playerName);
-                g2d.setFont(new Font("Arial", Font.BOLD, 16));
-                FontMetrics fm = g2d.getFontMetrics();
-                int textWidth = fm.stringWidth(displayName);
-                int textX = spriteScreenX - textWidth / 2;
-                int textY = drawStartY - 10;
-
-                //fond gris style pseudo minecraft
-                g2d.setColor(new Color(0, 0, 0, 150));
-                g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight() + 4);
-
-                g2d.setColor(Color.WHITE);
-                g2d.drawString(displayName, textX, textY);
-            }
         }
+    }
+
+    private void dessinerPseudo(Graphics2D g2d, String playerName, int spriteScreenX, int drawStartY) {
+        if (playerName == null || playerName.isEmpty()) return;
+
+        String displayName = truncateName(playerName);
+        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 16));
+        FontMetrics fm = g2d.getFontMetrics();
+        int textWidth = fm.stringWidth(displayName);
+        int textX = spriteScreenX - textWidth / 2;
+        int textY = drawStartY - 10;
+
+        //fond gris style pseudo Minecraft
+        g2d.setColor(new Color(0, 0, 0, 150));
+        g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight() + 4);
+
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(displayName, textX, textY);
     }
 
     private void dessinerLogs(Graphics g) {
@@ -525,7 +567,7 @@ public class Raycasting extends JFrame {
         if (logMessages.isEmpty()) return;
 
         Graphics2D g2d = (Graphics2D) g;
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 18));
         FontMetrics fm = g2d.getFontMetrics();
 
         int y = 30;
@@ -580,7 +622,7 @@ public class Raycasting extends JFrame {
         g2d.drawRoundRect(tableX, tableY, tableWidth, tableHeight, 20, 20);
 
         // Titre
-        g2d.setFont(new Font("Arial", Font.BOLD, 24));
+        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 24));
         FontMetrics fmTitle = g2d.getFontMetrics();
         String title = "JOUEURS EN LIGNE";
         int titleWidth = fmTitle.stringWidth(title);
@@ -592,7 +634,7 @@ public class Raycasting extends JFrame {
         g2d.drawLine(tableX + 20, tableY + headerHeight, tableX + tableWidth - 20, tableY + headerHeight);
 
         // Liste des joueurs
-        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2d.setFont(new Font(FONT_ARIAL, Font.PLAIN, 18));
 
         int y = tableY + headerHeight + 30;
         int index = 1;

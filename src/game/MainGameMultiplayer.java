@@ -10,29 +10,32 @@ import java.net.NetworkInterface;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 public class MainGameMultiplayer implements Runnable, NetworkListener {
 
-    private prototype_raycasting.Map map;
-    private Joueur joueur;
-    private Raycasting raycasting;
-    private Input input;
+    private static final Logger LOGGER = Logger.getLogger(MainGameMultiplayer.class.getName());
+
+    private final prototype_raycasting.Map map;
+    private final Joueur joueur;
+    private final Raycasting raycasting;
+    private final Input input;
     private Robot robot;
 
-    private GameNetworkAdapter network;
+    private final GameNetworkAdapter network;
     private final java.util.Map<String, Sprite> playerSprites;
 
     private boolean running;
-    private final int FPS = 60;
-    private final long OPTIMAL_TIME = 1_000_000_000 / FPS;
+    public static final int FPS = 60;
+    public static final long OPTIMAL_TIME = 1_000_000_000 / FPS;
 
     private static final String PLAYER_SPRITE_PATH = "assets/sprites/jonesy.png";
 
 
     private boolean mouseCaptured = true;
     private boolean escapePressed = false;
-    private Cursor blankCursor;
-    private Cursor defaultCursor;
+    private final Cursor blankCursor;
+    private final Cursor defaultCursor;
 
     private final Point centerPoint;
 
@@ -57,7 +60,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         try {
             robot = new Robot();
         } catch (AWTException e) {
-            e.printStackTrace();
+            LOGGER.log(java.util.logging.Level.SEVERE, "Erreur lors de la création du Robot", e);
         }
         BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
@@ -94,7 +97,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             try {
                 Thread.sleep(Math.max(0, (lastLoopTime - System.nanoTime() + OPTIMAL_TIME) / 1_000_000));
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOGGER.log(java.util.logging.Level.WARNING, "Thread interrompu", e);
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -104,12 +108,31 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private void update(double delta) {
         handleMouseCaptureState();
 
+        double moveSpeed = 1.5 * delta;
+        double rotSpeed = 2.0 * delta;
+
+        boolean moved = handleMovement(moveSpeed);
+        moved |= handleKeyboardRotation(rotSpeed);
+        moved |= handleMouseRotation();
+
+        if (moved) {
+            network.sendPlayerPosition();
+        }
+
+        // Gestion du scoreboard (touche Tab)
+        raycasting.setShowScoreboard(input.isShowScoreboard());
+        if (input.isShowScoreboard()) {
+            List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
+            raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
+        }
+
+        updateRemotePlayerSprites();
+    }
+
+    private boolean handleMovement(double moveSpeed) {
         double angle = joueur.getAngle();
         double cos = Math.cos(angle);
         double sin = Math.sin(angle);
-
-        double moveSpeed = 1.5 * delta;
-        double rotSpeed = 2.0 * delta;
 
         double dx = 0;
         double dy = 0;
@@ -135,62 +158,67 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         if (dx != 0 || dy != 0) {
             dx *= moveSpeed;
             dy *= moveSpeed;
-
-            double nextX = joueur.getX() + dx;
-            double nextY = joueur.getY() + dy;
-
-            if (!map.isWall((int) nextX, (int) joueur.getY())) {
-                joueur.setX(nextX);
-                moved = true;
-            }
-
-            if (!map.isWall((int) joueur.getX(), (int) nextY)) {
-                joueur.setY(nextY);
-                moved = true;
-            }
+            moved = applyMovement(dx, dy);
         }
 
+        return moved;
+    }
+
+    private boolean applyMovement(double dx, double dy) {
+        boolean moved = false;
+        double nextX = joueur.getX() + dx;
+        double nextY = joueur.getY() + dy;
+
+        if (!map.isWall((int) nextX, (int) joueur.getY())) {
+            joueur.setX(nextX);
+            moved = true;
+        }
+
+        if (!map.isWall((int) joueur.getX(), (int) nextY)) {
+            joueur.setY(nextY);
+            moved = true;
+        }
+
+        return moved;
+    }
+
+    private boolean handleKeyboardRotation(double rotSpeed) {
+        double angle = joueur.getAngle();
         if (input.isTurnLeft()) {
             joueur.setAngle(angle - rotSpeed);
-            moved = true;
+            return true;
         } else if (input.isTurnRight()) {
             joueur.setAngle(angle + rotSpeed);
-            moved = true;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleMouseRotation() {
+        if (!mouseCaptured || !raycasting.isShowing()) {
+            return false;
         }
 
-        if (mouseCaptured && raycasting.isShowing()) {
-            int width = raycasting.getWidth();
-            int height = raycasting.getHeight();
-            int centerX = width / 2;
-            int centerY = height / 2;
+        int width = raycasting.getWidth();
+        int height = raycasting.getHeight();
+        int centerX = width / 2;
+        int centerY = height / 2;
 
-            int deltaX = input.getMouseX() - centerX;
+        int deltaX = input.getMouseX() - centerX;
 
-            if (deltaX != 0) {
-                joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
-                moved = true;
+        if (deltaX != 0) {
+            joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
 
-                centerPoint.setLocation(centerX, centerY);
-                SwingUtilities.convertPointToScreen(centerPoint, raycasting);
-                robot.mouseMove(centerPoint.x, centerPoint.y);
+            centerPoint.setLocation(centerX, centerY);
+            SwingUtilities.convertPointToScreen(centerPoint, raycasting);
+            robot.mouseMove(centerPoint.x, centerPoint.y);
 
-                input.setMouseX(centerX);
-                input.setMouseY(centerY);
-            }
+            input.setMouseX(centerX);
+            input.setMouseY(centerY);
+            return true;
         }
 
-        if (moved){
-            network.sendPlayerPosition();
-        }
-
-        // Gestion du scoreboard (touche Tab)
-        raycasting.setShowScoreboard(input.isShowScoreboard());
-        if (input.isShowScoreboard()) {
-            List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
-            raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
-        }
-
-        updateRemotePlayerSprites();
+        return false;
     }
 
     private void handleMouseCaptureState() {
@@ -316,7 +344,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             // Ignorer
         }
         return "localhost";
@@ -325,48 +353,48 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.println("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
+        LOGGER.info("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
 
         // Afficher l'IP locale
         String localIP = getLocalIPAddress();
-        System.out.println("Votre IP locale: " + localIP);
-        System.out.println("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
+        LOGGER.log(java.util.logging.Level.INFO, "Votre IP locale: {0}", localIP);
+        LOGGER.info("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
 
-        System.out.print("Votre nom de joueur: ");
+        LOGGER.info("Votre nom de joueur: ");
         String playerId = scanner.nextLine().trim();
         if (playerId.isEmpty()) playerId = "Player" + System.currentTimeMillis() % 1000;
 
-        System.out.print("Votre port (ex: 5001): ");
+        LOGGER.info("Votre port (ex: 5001): ");
         int port = Integer.parseInt(scanner.nextLine().trim());
 
-        System.out.println("\n=== Mode Peer-to-Peer (Maillage complet) ===");
-        System.out.println("Vous pouvez vous connecter à un ou plusieurs joueurs.");
-        System.out.println("Le réseau se synchronisera automatiquement (tous connectés à tous).\n");
+        LOGGER.info("\n=== Mode Peer-to-Peer (Maillage complet) ===");
+        LOGGER.info("Vous pouvez vous connecter à un ou plusieurs joueurs.");
+        LOGGER.info("Le réseau se synchronisera automatiquement (tous connectés à tous).\n");
 
-        System.out.print("Voulez-vous rejoindre un joueur existant? (o/n): ");
+        LOGGER.info("Voulez-vous rejoindre un joueur existant? (o/n): ");
         String wantToConnect = scanner.nextLine().trim().toLowerCase();
 
         MainGameMultiplayer game;
 
         if (wantToConnect.equals("o") || wantToConnect.equals("oui")) {
-            System.out.print("IP du pair (ex: localhost ou 192.168.1.10): ");
+            LOGGER.info("IP du pair (ex: localhost ou 192.168.1.10): ");
             String peerIp = scanner.nextLine().trim();
 
-            System.out.print("Port du pair: ");
+            LOGGER.info("Port du pair: ");
             int peerPort = Integer.parseInt(scanner.nextLine().trim());
 
             game = new MainGameMultiplayer(playerId, port, peerIp, peerPort);
-            System.out.println("\nConnexion au pair " + peerIp + ":" + peerPort);
-            System.out.println("Le maillage P2P va se former automatiquement...");
+            LOGGER.log(java.util.logging.Level.INFO, "\nConnexion au pair {0}:{1}", new Object[]{peerIp, peerPort});
+            LOGGER.info("Le maillage P2P va se former automatiquement...");
         } else {
             game = new MainGameMultiplayer(playerId, port, null, 0);
-            System.out.println("\nEn attente de connexions sur le port " + port);
-            System.out.println("Les autres joueurs peuvent se connecter à votre IP:port");
+            LOGGER.log(java.util.logging.Level.INFO, "\nEn attente de connexions sur le port {0}", port);
+            LOGGER.info("Les autres joueurs peuvent se connecter à votre IP:port");
         }
 
-        System.out.println("\nDémarrage du jeu...");
-        System.out.println("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
-        System.out.println("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
+        LOGGER.info("\nDémarrage du jeu...");
+        LOGGER.info("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
+        LOGGER.info("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
 
         new Thread(game).start();
     }
