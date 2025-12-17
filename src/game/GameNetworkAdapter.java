@@ -1,7 +1,6 @@
 package game;
 
 import Reseau.GestionConnection;
-import Reseau.Serveur;
 import prototype_raycasting.Joueur;
 
 import java.util.Map;
@@ -10,54 +9,82 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class GameNetworkAdapter {
 
-    private ServeurGame serveur;
+    private final ServeurGame serveur;
     private Joueur localPlayer;
-    private Map<String, Joueur> remotePlayers;
-    private Set<String> notifiedPlayers; // Pour éviter les notifications en double
+    private final Map<String, Joueur> remotePlayers;
+    private final Set<String> notifiedPlayers; // Pour éviter les notifications en double
     private NetworkListener listener;
 
-
+    /**
+    * Constructeur de l'adaptateur réseau de jeu
+     */
     public GameNetworkAdapter(String nodeId, String host, int port) {
         this.serveur = new ServeurGame(nodeId, host, port, this);
         this.remotePlayers = new ConcurrentHashMap<>();
         this.notifiedPlayers = ConcurrentHashMap.newKeySet();
     }
-
+    /**
+    * Définir le joueur local
+     */
     public void setLocalPlayer(Joueur player) {
         this.localPlayer = player;
         this.localPlayer.setId(serveur.getNodeId());
     }
 
+    /**
+     * Définir le listener réseau
+     * @param listener listener à définir
+     */
     public void setNetworkListener(NetworkListener listener) {
         this.listener = listener;
     }
 
+    /**
+     * Démarrer le serveur réseau
+     */
     public void start() {
         serveur.start();
     }
 
+    /**
+     * Connecter à un autre joueur
+     */
     public void connectToPlayer(String playerId, String host, int port) {
         serveur.connectToNode(playerId, host, port);
     }
 
+    /**
+     * Envoyer la position du joueur local à tous les pairs
+     */
     public void sendPlayerPosition() {
         if (localPlayer == null) return;
         String message = "MOVE:" + localPlayer.getId() + ":" + localPlayer.toNetworkString();
         serveur.broadcastToPeers(message);
     }
 
+    /**
+     * Envoyer immédiatement la position du joueur local à tous les pairs
+     */
     public void sendPlayerPositionNow() {
         if (localPlayer == null) return;
         String message = "MOVE:" + localPlayer.getId() + ":" + localPlayer.toNetworkString();
         serveur.broadcastToPeers(message);
     }
 
+    /**
+     * Envoyer la position du joueur local à un pair spécifique
+     */
     void sendPlayerPositionTo(GestionConnection peer) {
         if (localPlayer == null) return;
         String message = "MOVE:" + localPlayer.getId() + ":" + localPlayer.toNetworkString();
         peer.sendMessage(message);
     }
 
+    /**
+     * Gérer la réception de la position d'un autre joueur
+     * @param playerId identifiant du joueur
+     * @param positionData données de position reçues
+     */
     void onPositionReceived(String playerId, String positionData) {
         if (localPlayer != null && playerId.equals(localPlayer.getId())) {
             return;
@@ -103,6 +130,10 @@ public class GameNetworkAdapter {
         }
     }
 
+    /**
+     * Gérer la déconnexion d'un joueur
+     * @param playerId identifiant du joueur déconnecté
+     */
     void onPlayerDisconnected(String playerId) {
         Joueur removed = remotePlayers.remove(playerId);
         notifiedPlayers.remove(playerId); // Permettre une re-notification si le joueur revient
@@ -111,105 +142,27 @@ public class GameNetworkAdapter {
         }
     }
 
-    void onNewPeerConnected(String peerId) {
-        sendPlayerPositionNow();
-    }
-
+    /**
+     * Obtenir la liste des joueurs distants
+     * @return Map des joueurs distants
+     */
     public Map<String, Joueur> getRemotePlayers() {
         return remotePlayers;
     }
 
+    /**
+     * Obtenir un joueur distant par son ID
+     * @param playerId identifiant du joueur
+     * @return Joueur distant ou null s'il n'existe pas
+     */
     public Joueur getRemotePlayer(String playerId) {
         return remotePlayers.get(playerId);
     }
 
+    /**
+     * Arrêter le serveur réseau
+     */
     public void shutdown() {
         serveur.shutdown();
-    }
-
-    public String getNodeId() {
-        return serveur.getNodeId();
-    }
-
-    private static class ServeurGame extends Serveur {
-        private GameNetworkAdapter adapter;
-        private String nodeId;
-
-        private Map<String, Long> lastRelayTime = new ConcurrentHashMap<>();
-        private static final long RELAY_MIN_INTERVAL_MS = 30;
-
-        public ServeurGame(String nodeId, String host, int port, GameNetworkAdapter adapter) {
-            super(nodeId, host, port);
-            this.nodeId = nodeId;
-            this.adapter = adapter;
-        }
-
-        @Override
-        protected void onPeerDisconnected(String peerId) {
-            adapter.onPlayerDisconnected(peerId);
-        }
-
-        @Override
-        protected void onPeerConnected(String peerId) {
-            adapter.onNewPeerConnected(peerId);
-        }
-
-        @Override
-        public String getNodeId() {
-            return nodeId;
-        }
-
-        @Override
-        public void processMessageFromPeer(String message, GestionConnection sender) {
-            if (message == null || message.trim().isEmpty()) {
-                return;
-            }
-
-            if (message.startsWith("MOVE:")) {
-                processGameMoveMessage(message, sender);
-            } else {
-                super.processMessageFromPeer(message, sender);
-            }
-        }
-
-        private void processGameMoveMessage(String message, GestionConnection sender) {
-            try {
-                String content = message.substring(5);
-                int colonIndex = content.indexOf(':');
-                if (colonIndex == -1) {
-                    return;
-                }
-
-                String playerId = content.substring(0, colonIndex);
-                String positionData = content.substring(colonIndex + 1);
-
-                if (sender.getRemotePeerId() == null) {
-                    sender.setRemotePeerId(playerId);
-                    adapter.sendPlayerPositionTo(sender);
-                }
-
-                long now = System.currentTimeMillis();
-                Long lastTime = lastRelayTime.get(playerId);
-                if (lastTime != null && (now - lastTime) < RELAY_MIN_INTERVAL_MS) {
-                    adapter.onPositionReceived(playerId, positionData);
-                    return;
-                }
-                lastRelayTime.put(playerId, now);
-
-                adapter.onPositionReceived(playerId, positionData);
-
-                for (GestionConnection peer : getConnectedPeers()) {
-                    if (peer != sender) {
-                        peer.sendMessage(message);
-                    }
-                }
-            } catch (Exception e) {
-                //ignorer les erreurs de parsing
-            }
-        }
-
-        protected java.util.List<GestionConnection> getConnectedPeers() {
-            return getConnectedPeersList();
-        }
     }
 }

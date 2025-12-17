@@ -2,17 +2,13 @@ package Reseau;
 
 /**
  * Classe représentant les informations d'un pair dans le réseau P2P
- *
  * Stocke l'identifiant, l'adresse IP et le port d'un nœud P2P.
  * Permet la sérialisation et désérialisation au format "peerId@host:port"
- *
- * @author Groupe DOOM
- * @version 1.0
  */
 public class PeerInfo {
-    private String peerId;
-    private String host;
-    private int port;
+    private final String peerId;
+    private final String host;
+    private final int port;
 
     /**
      * Constructeur de PeerInfo
