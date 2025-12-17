@@ -36,6 +36,11 @@ public class GestionConnection implements Runnable {
         this.socket = socket;
         this.localNode = localNode;
         try {
+            // Optimisation pour réduire la latence (désactiver l'algorithme de Nagle)
+            socket.setTcpNoDelay(true);
+            // Privilégier la latence (1) et la bande passante (0) par rapport au temps de connexion (0)
+            socket.setPerformancePreferences(0, 1, 0);
+            
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             startTickSystem();
@@ -63,6 +68,8 @@ public class GestionConnection implements Runnable {
             }
         });
         tickThread.setDaemon(true);
+        // Augmenter la priorité du thread d'envoi pour assurer la régularité des ticks
+        tickThread.setPriority(Thread.MAX_PRIORITY);
         tickThread.start();
     }
 

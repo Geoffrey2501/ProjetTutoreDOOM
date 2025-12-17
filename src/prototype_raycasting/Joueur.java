@@ -14,6 +14,13 @@ public class Joueur {
     private double angle;
     private boolean positionInitialized = false; // Flag pour savoir si la position est valide
 
+    // Interpolation variables
+    private double targetX;
+    private double targetY;
+    private double targetAngle;
+    private static final double INTERPOLATION_SPEED = 25.0; // Augmenté pour être plus réactif (was 10.0)
+    private static final double TELEPORT_THRESHOLD = 50.0; // Distance au-delà de laquelle on téléporte directement
+
     /**
      * Constructeur avec identifiant (pour multijoueur)
      */
@@ -22,6 +29,12 @@ public class Joueur {
         this.x = x;
         this.y = y;
         this.angle = normalizeAngle(angle);
+        
+        // Initialiser les cibles à la position actuelle
+        this.targetX = x;
+        this.targetY = y;
+        this.targetAngle = this.angle;
+        
         this.positionInitialized = true; // Position explicitement définie
     }
 
@@ -40,6 +53,9 @@ public class Joueur {
         this.x = 0;
         this.y = 0;
         this.angle = 0;
+        this.targetX = 0;
+        this.targetY = 0;
+        this.targetAngle = 0;
         this.positionInitialized = false; // Position pas encore reçue
     }
 
@@ -86,7 +102,54 @@ public class Joueur {
         this.x = x;
         this.y = y;
         this.angle = normalizeAngle(angle);
+        
+        // Reset targets to avoid interpolation glitch when teleporting
+        this.targetX = x;
+        this.targetY = y;
+        this.targetAngle = this.angle;
+        
         this.positionInitialized = true;
+    }
+
+    /**
+     * Met à jour la position cible pour l'interpolation
+     */
+    public void setTargetPosition(double x, double y, double angle) {
+        this.targetX = x;
+        this.targetY = y;
+        this.targetAngle = normalizeAngle(angle);
+        this.positionInitialized = true;
+    }
+
+    /**
+     * Interpole la position actuelle vers la position cible
+     * @param delta Temps écoulé depuis la dernière frame (en secondes)
+     */
+    public void interpolate(double delta) {
+        if (!positionInitialized) return;
+        
+        // Si la distance est trop grande, on téléporte directement (éviter le "sliding" sur longue distance)
+        double distSq = (targetX - x) * (targetX - x) + (targetY - y) * (targetY - y);
+        if (distSq > TELEPORT_THRESHOLD * TELEPORT_THRESHOLD) {
+            x = targetX;
+            y = targetY;
+            angle = targetAngle;
+            return;
+        }
+        
+        // Interpolation linéaire simple (LERP)
+        double t = Math.min(1.0, delta * INTERPOLATION_SPEED);
+        
+        this.x += (targetX - this.x) * t;
+        this.y += (targetY - this.y) * t;
+        
+        // Interpolation d'angle (plus complexe à cause du modulo 2PI)
+        double diff = targetAngle - this.angle;
+        // Ajuster la différence pour prendre le chemin le plus court
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        
+        this.angle = normalizeAngle(this.angle + diff * t);
     }
 
     /**
@@ -113,16 +176,39 @@ public class Joueur {
             }
 
             if (parts.length >= 3) {
-                this.x = Double.parseDouble(parts[0].trim());
-                this.y = Double.parseDouble(parts[1].trim());
-                this.angle = normalizeAngle(Double.parseDouble(parts[2].trim()));
-                this.positionInitialized = true;
+                double newX = Double.parseDouble(parts[0].trim());
+                double newY = Double.parseDouble(parts[1].trim());
+                double newAngle = normalizeAngle(Double.parseDouble(parts[2].trim()));
+                
+                if (!positionInitialized) {
+                    // Première fois : téléportation
+                    this.x = newX;
+                    this.y = newY;
+                    this.angle = newAngle;
+                    this.targetX = newX;
+                    this.targetY = newY;
+                    this.targetAngle = newAngle;
+                    this.positionInitialized = true;
+                } else {
+                    // Mises à jour suivantes : interpolation
+                    setTargetPosition(newX, newY, newAngle);
+                }
                 return true;
             } else if (parts.length == 2) {
                 // Compatibilité avec l'ancien format x,y sans angle
-                this.x = Double.parseDouble(parts[0].trim());
-                this.y = Double.parseDouble(parts[1].trim());
-                this.positionInitialized = true;
+                double newX = Double.parseDouble(parts[0].trim());
+                double newY = Double.parseDouble(parts[1].trim());
+                
+                if (!positionInitialized) {
+                    this.x = newX;
+                    this.y = newY;
+                    this.targetX = newX;
+                    this.targetY = newY;
+                    this.positionInitialized = true;
+                } else {
+                    this.targetX = newX;
+                    this.targetY = newY;
+                }
                 return true;
             }
         } catch (NumberFormatException e) {

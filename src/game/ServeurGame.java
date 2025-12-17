@@ -3,13 +3,10 @@ package game;
 import Reseau.GestionConnection;
 import Reseau.Serveur;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Classe représentant le serveur de jeu multijoueur.
  * Étend la classe Serveur pour gérer les communications réseau spécifiques au jeu.
- * Gère les messages de position des joueurs et leur relais aux autres pairs.
+ * Gère les messages de position des joueurs en P2P maillé complet.
  */
 public class ServeurGame extends Serveur {
     /** Adaptateur réseau pour communiquer avec le jeu */
@@ -17,12 +14,6 @@ public class ServeurGame extends Serveur {
 
     /** Identifiant unique du nœud */
     private final String nodeId;
-
-    /** Map stockant le dernier temps de relais pour chaque joueur */
-    private final Map<String, Long> lastRelayTime = new ConcurrentHashMap<>();
-
-    /** Intervalle minimum en millisecondes entre deux relais de position */
-    private static final long RELAY_MIN_INTERVAL_MS = 30;
 
     /**
      * Constructeur du serveur de jeu.
@@ -79,8 +70,9 @@ public class ServeurGame extends Serveur {
 
     /**
      * Traite un message de déplacement de joueur.
-     * Extrait les informations de position, met à jour l'état du jeu
-     * et relaye le message aux autres pairs connectés.
+     * Extrait les informations de position et met à jour l'état du jeu.
+     * En P2P maillé complet, pas de relais nécessaire car chaque joueur
+     * envoie directement sa position à tous les pairs.
      *
      * @param message Message de déplacement au format "MOVE:playerId:positionData"
      * @param sender  Connexion du pair émetteur
@@ -96,38 +88,19 @@ public class ServeurGame extends Serveur {
             String playerId = content.substring(0, colonIndex);
             String positionData = content.substring(colonIndex + 1);
 
+            // Identifier le pair si pas encore fait
             if (sender.getRemotePeerId() == null) {
                 sender.setRemotePeerId(playerId);
                 adapter.sendPlayerPositionTo(sender);
             }
 
-            long now = System.currentTimeMillis();
-            Long lastTime = lastRelayTime.get(playerId);
-            if (lastTime != null && (now - lastTime) < RELAY_MIN_INTERVAL_MS) {
-                adapter.onPositionReceived(playerId, positionData);
-                return;
-            }
-            lastRelayTime.put(playerId, now);
-
+            // Mettre à jour la position localement
             adapter.onPositionReceived(playerId, positionData);
 
-            for (GestionConnection peer : getConnectedPeers()) {
-                if (peer != sender) {
-                    peer.sendMessage(message);
-                }
-            }
+            // Pas de relais en P2P maillé complet
         } catch (Exception e) {
             // Ignorer les erreurs de parsing
         }
-    }
-
-    /**
-     * Obtenir la liste des pairs connectés.
-     *
-     * @return Liste des connexions aux pairs
-     */
-    protected java.util.List<GestionConnection> getConnectedPeers() {
-        return getConnectedPeersList();
     }
 }
 

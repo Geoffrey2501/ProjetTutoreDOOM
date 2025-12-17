@@ -70,6 +70,8 @@ public class Serveur {
     public void start() {
         try {
             serverSocket = new ServerSocket(port);
+            // Optimisation : privilégier la latence (1) et la bande passante (0)
+            serverSocket.setPerformancePreferences(0, 1, 0);
 
             //obtenir l'IP réelle de la machine
             String realHost = getLocalIPAddress();
@@ -233,6 +235,7 @@ public class Serveur {
 
     /**
      * Traiter un message de type MOVE:playerId:x,y
+     * En P2P maillé complet, pas de relais nécessaire.
      */
     private void processMoveMessage(String message, GestionConnection sender) {
         try {
@@ -268,12 +271,7 @@ public class Serveur {
 
             playerPositions.put(playerId, new int[]{x, y});
 
-            // Relayer aux autres pairs
-            for (GestionConnection peer : connectedPeers) {
-                if (peer != sender) {
-                    peer.sendMessage(message);
-                }
-            }
+            // Pas de relais en P2P maillé complet
         } catch (NumberFormatException e) {
             // Ignorer
         }
@@ -334,6 +332,7 @@ public class Serveur {
 
     /**
      * Traiter un message au format ancien (compatibilité) : "playerId:x,y"
+     * En P2P maillé complet, pas de relais nécessaire.
      */
     private void processLegacyMoveMessage(String message, GestionConnection sender) {
         try {
@@ -349,12 +348,7 @@ public class Serveur {
 
             playerPositions.put(playerId, new int[]{x, y});
 
-            // Relayer aux autres pairs
-            for (GestionConnection peer : connectedPeers) {
-                if (peer != sender) {
-                    peer.sendMessage(message);
-                }
-            }
+            // Pas de relais en P2P maillé complet
         } catch (NumberFormatException e) {
             // Ignorer
         }

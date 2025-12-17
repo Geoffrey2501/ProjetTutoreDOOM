@@ -126,7 +126,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
         }
 
-        updateRemotePlayerSprites();
+        updateRemotePlayerSprites(delta);
     }
 
     private boolean handleMovement(double moveSpeed) {
@@ -257,10 +257,13 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         }
     }
 
-    private void updateRemotePlayerSprites() {
+    private void updateRemotePlayerSprites(double delta) {
         for (java.util.Map.Entry<String, Joueur> entry : network.getRemotePlayers().entrySet()) {
             String playerId = entry.getKey();
             Joueur remotePlayer = entry.getValue();
+
+            // Interpolation : lisser le mouvement du joueur distant
+            remotePlayer.interpolate(delta);
 
             Sprite sprite = playerSprites.get(playerId);
             if (sprite != null) {
