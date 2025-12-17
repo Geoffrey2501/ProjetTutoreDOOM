@@ -13,8 +13,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Raycasting extends JFrame {
+
+    private static final Logger LOGGER = Logger.getLogger(Raycasting.class.getName());
 
     private JPanel panelDessin;
     private boolean render;
@@ -27,13 +31,12 @@ public class Raycasting extends JFrame {
     private double[] zBuffer;
 
     // Texture du mur
-    private BufferedImage wallTexture;
     private int[] wallTexturePixels; // Pixels de la texture en tableau pour accès rapide
     private int texWidth = 64;
     private int texHeight = 64;
 
     // Buffer de rendu pour optimisation
-    private BufferedImage screenBuffer;
+    private transient BufferedImage screenBuffer;
     private int[] screenPixels;
     private int lastScreenWidth = 0;
     private int lastScreenHeight = 0;
@@ -185,7 +188,7 @@ public class Raycasting extends JFrame {
                 // Convertir en TYPE_INT_ARGB pour accès rapide aux pixels
                 texWidth = loaded.getWidth();
                 texHeight = loaded.getHeight();
-                wallTexture = new BufferedImage(texWidth, texHeight, BufferedImage.TYPE_INT_ARGB);
+                BufferedImage wallTexture = new BufferedImage(texWidth, texHeight, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D g2d = wallTexture.createGraphics();
                 g2d.drawImage(loaded, 0, 0, null);
                 g2d.dispose();
@@ -194,15 +197,13 @@ public class Raycasting extends JFrame {
                 wallTexturePixels = new int[texWidth * texHeight];
                 wallTexture.getRGB(0, 0, texWidth, texHeight, wallTexturePixels, 0, texWidth);
 
-                System.out.println("Texture du mur chargée: " + texWidth + "x" + texHeight);
+                LOGGER.log(Level.INFO, "Texture du mur chargée: {0}x{1}", new Object[]{texWidth, texHeight});
             } else {
-                System.err.println("Fichier texture non trouvé: assets/wall.png - Utilisation des couleurs par défaut");
-                wallTexture = null;
+                LOGGER.warning("Fichier texture non trouvé: assets/wall.png - Utilisation des couleurs par défaut");
                 wallTexturePixels = null;
             }
         } catch (IOException e) {
-            System.err.println("Erreur lors du chargement de la texture: " + e.getMessage());
-            wallTexture = null;
+            LOGGER.log(Level.SEVERE, e, () -> "Erreur lors du chargement de la texture: " + e.getMessage());
             wallTexturePixels = null;
         }
     }
@@ -348,10 +349,6 @@ public class Raycasting extends JFrame {
             int drawStart = Math.max(0, drawStartRaw);
             int drawEnd = Math.min(screenHeight - 1, drawEndRaw);
 
-            //calculer les positions de début et fin du mur
-            if (drawStart < 0) drawStart = 0;
-
-            if (drawEnd >= screenHeight) drawEnd = screenHeight - 1;
 
             //calculer la position et largeur de chaque colonne pour éviter les gaps
             int x1 = (i * screenWidth) / numRays;
@@ -372,7 +369,7 @@ public class Raycasting extends JFrame {
             if ((!side && rayDirX > 0) || (side && rayDirY < 0)) {
                 texY = texHeight - texY - 1;
             }
-            texY = Math.max(0, Math.min(texHeight - 1, texY));
+            texY = Math.clamp(texY, 0, texHeight - 1);
 
 
             //dessiner les colonnes du mur
@@ -385,9 +382,7 @@ public class Raycasting extends JFrame {
                         double d = (double)(y - drawStartRaw) / (double)(drawEndRaw - drawStartRaw);
 
                         // convertir en coordonnée de texture
-                        int texX = (int)(d * texWidth);
-                        if (texX < 0) texX = 0;
-                        if (texX >= texWidth) texX = texWidth - 1;
+                        int texX = Math.clamp((int)(d * texWidth), 0, texWidth - 1);
 
                         int color = wallTexturePixels[texY * texWidth + texX];
 
@@ -598,7 +593,6 @@ public class Raycasting extends JFrame {
 
         // Liste des joueurs
         g2d.setFont(new Font("Arial", Font.PLAIN, 18));
-        FontMetrics fm = g2d.getFontMetrics();
 
         int y = tableY + headerHeight + 30;
         int index = 1;
@@ -618,11 +612,10 @@ public class Raycasting extends JFrame {
 
             // Nom du joueur
             // Version plus claire de la couleur pour le texte
-            Color textColor = new Color(
-                Math.min(255, playerColor.getRed() + 55),
-                Math.min(255, playerColor.getGreen() + 55),
-                Math.min(255, playerColor.getBlue() + 55)
-            );
+            int red = Math.min(playerColor.getRed() + 55, 255);
+            int green = Math.min(playerColor.getGreen() + 55, 255);
+            int blue = Math.min(playerColor.getBlue() + 55, 255);
+            Color textColor = new Color(red, green, blue);
             g2d.setColor(textColor);
 
             if (isLocal) {

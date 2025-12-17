@@ -56,7 +56,7 @@ public class Map {
         }
 
         this.height = lines.size();
-        this.width = lines.get(0).length();
+        this.width = lines.getFirst().length();
 
         if (this.width == 0) {
             throw new IllegalArgumentException("Largeur invalide (ligne 1 vide) dans: " + fichier);
