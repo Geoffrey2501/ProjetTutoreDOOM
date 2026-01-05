@@ -1,0 +1,28 @@
+@startuml PasDeCollision
+'Diagramme de séquence - Cas : Balle ne touche personne
+
+title Cas : Pas de collision - Balle continue
+
+autonumber
+
+participant "MainGameMultiplayer" as G
+participant "Balle" as B
+
+activate G
+G -> B: collision(listeJoueurs)
+activate B
+
+B -> B: Mettre à jour position
+
+
+B -> B: Parcourir liste joueurs
+B -> B: Calculer distance balle-joueur
+B -> B: Pas de collision (distance >= hitbox)
+
+B --> G: return null
+deactivate B
+
+G -> G: Continuer boucle de jeu
+deactivate G
+
+@enduml

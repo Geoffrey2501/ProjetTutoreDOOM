@@ -1,0 +1,38 @@
+@startuml CollisionToucheJoueur
+
+title Cas 1 : Collision détectée - Joueur touché
+
+autonumber
+
+participant "MainGameMultiplayer" as G
+participant "Balle" as B
+participant "Joueur Cible" as JC
+
+activate G
+G -> B: collision(listeJoueurs)
+activate B
+
+B -> B: Mettre à jour position
+
+B -> B: Parcourir liste joueurs
+B -> B: Calculer distance balle-joueur
+B -> B: Collision détectée (distance < hitbox)
+
+B --> G: return Joueur touché
+deactivate B
+
+G -> JC: appliquerDegats(damage)
+activate JC
+
+JC -> JC: HP = HP - damage
+JC -> JC: Clamp HP [0, 100]
+JC -> JC: Animation hit
+JC --> G: dégâts appliqués (HP restant)
+deactivate JC
+
+G -> G: Retirer balle de liste balles
+destroy B
+
+deactivate G
+
+@enduml
