@@ -1,0 +1,58 @@
+@startuml
+'Diagramme de séquence - Ajout de balles en réseau P2P
+
+autonumber
+
+actor Joueur
+participant "Client Local" as CL
+participant "GameNetworkAdapter" as GNA
+participant "Réseau P2P" as Net
+participant "Client Distant" as CD
+participant "GameNetworkAdapter\nDistant" as GNAD
+participant "Game Manager\nDistant" as GMD
+
+
+activate Joueur
+Joueur -> CL: Tirer (position, direction)
+activate CL
+
+CL -> CL: créer nouvelle Balle
+CL -> CL: ajouter à liste balles locales
+
+CL -> GNA: envoyerBalle(balleData)
+activate GNA
+
+GNA -> GNA: sérialiser données balle
+GNA -> Net: broadcast("BALLE_AJOUTEE", balleData)
+activate Net
+
+Net -> CD: transmettre message
+activate CD
+
+CD -> GNAD: recevoir("BALLE_AJOUTEE", balleData)
+activate GNAD
+
+GNAD -> GNAD: désérialiser données
+GNAD -> GMD: ajouterBalle(position, vitesse, direction)
+activate GMD
+
+GMD -> GMD: créer Balle depuis données
+GMD -> GMD: ajouter à liste balles
+GMD --> GNAD: balle synchronisée
+deactivate GMD
+
+GNAD --> CD: confirmation
+deactivate GNAD
+
+CD --> Net: ACK
+deactivate CD
+
+Net --> GNA: confirmation diffusion
+deactivate Net
+
+GNA --> CL: balle envoyée
+deactivate GNA
+CL --> Joueur: balle tirée
+deactivate CL
+
+@enduml
