@@ -2,7 +2,7 @@ package monstre;
 
 import java.util.ArrayList;
 
-public class RTT {
+public class RRT {
     private Map map;
 
     private int MAX_ITERATIONS = 1000;
@@ -14,7 +14,7 @@ public class RTT {
     private Noeud debut;
     private Noeud fin;
 
-    public RTT(Map map) {
+    public RRT(Map map) {
         this.map = map;
         this.noeuds = new ArrayList<>();
     }
