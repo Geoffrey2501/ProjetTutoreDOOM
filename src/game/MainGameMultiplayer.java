@@ -1,6 +1,9 @@
 package game;
 
-import prototype_raycasting.*;
+import moteur_graphique.Window;
+import moteur_graphique.raycasting.Raycasting;
+import prototype_raycasting.Joueur;
+import prototype_raycasting.Sprite;
 
 import javax.swing.*;
 import java.awt.*;
@@ -18,7 +21,11 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     private final prototype_raycasting.Map map;
     private final Joueur joueur;
+
+    //séparation : Window pour l'UI/Fenêtre, GameRenderer pour le calcul/rendu
+    private final Window window;
     private final Raycasting raycasting;
+
     private final Input input;
     private Robot robot;
 
@@ -30,7 +37,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     public static final long OPTIMAL_TIME = 1_000_000_000 / FPS;
 
     private static final String PLAYER_SPRITE_PATH = "assets/sprites/jonesy.png";
-
 
     private boolean mouseCaptured = true;
     private boolean escapePressed = false;
@@ -46,27 +52,35 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         playerSprites = new ConcurrentHashMap<>();
         centerPoint = new Point();
 
+        // 1. Initialisation du moteur de rendu (logique pure)
         raycasting = new Raycasting(map, joueur);
-        raycasting.addKeyListener(input);
-        raycasting.addMouseListener(input);
-        raycasting.addMouseMotionListener(input);
-        raycasting.setFocusable(true);
-        raycasting.requestFocus();
-        raycasting.setVisible(true);
 
-        // Désactiver le focus traversal pour capturer la touche Tab
-        Input.disableFocusTraversal(raycasting);
+        // 2. Initialisation de la fenêtre (UI)
+        // On définit une taille par défaut, par exemple 1280x720 ou 1920x1080
+        window = new Window(1920, 1080);
+
+        //GameRenderer r = new TopDownRenderer(map, joueur);
+        //window.setRenderer(r);
+
+        // 3. On lie le moteur à la fenêtre
+        window.setRenderer(raycasting);
+
+        // 4. Gestion des Inputs sur la fenêtre
+        window.addInputListener(input);
 
         try {
             robot = new Robot();
         } catch (AWTException e) {
             LOGGER.log(java.util.logging.Level.SEVERE, "Erreur lors de la création du Robot", e);
         }
+
         BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
                 cursorImg, new Point(0, 0), "blank cursor");
         defaultCursor = Cursor.getDefaultCursor();
-        raycasting.getContentPane().setCursor(blankCursor);
+
+        // Application du curseur sur la fenêtre
+        window.setCursor(blankCursor);
 
         network = new GameNetworkAdapter(playerId, "localhost", port);
         network.setLocalPlayer(joueur);
@@ -77,7 +91,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             network.connectToPlayer("Server", serverIp, serverPort);
         }
 
-        raycasting.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
+        // Log via la fenêtre
+        window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
 
     @Override
@@ -92,7 +107,9 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             double delta = updateLength / 1_000_000_000.0;
 
             update(delta);
-            raycasting.render();
+
+            // Rendu via la fenêtre
+            window.draw();
 
             try {
                 Thread.sleep(Math.max(0, (lastLoopTime - System.nanoTime() + OPTIMAL_TIME) / 1_000_000));
@@ -119,11 +136,11 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             network.sendPlayerPosition();
         }
 
-        // Gestion du scoreboard (touche Tab)
-        raycasting.setShowScoreboard(input.isShowScoreboard());
+        // Gestion du scoreboard via Window
+        window.setShowScoreboard(input.isShowScoreboard());
         if (input.isShowScoreboard()) {
             List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
-            raycasting.updatePlayerList(joueur.getId(), remotePlayerNames);
+            window.updatePlayerList(joueur.getId(), remotePlayerNames);
         }
 
         updateRemotePlayerSprites(delta);
@@ -195,12 +212,14 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     }
 
     private boolean handleMouseRotation() {
-        if (!mouseCaptured || !raycasting.isShowing()) {
+        // On vérifie si la fenêtre est visible et active
+        if (!mouseCaptured || !window.isVisible()) {
             return false;
         }
 
-        int width = raycasting.getWidth();
-        int height = raycasting.getHeight();
+        // On utilise les dimensions de la Window
+        int width = window.getWidth();
+        int height = window.getHeight();
         int centerX = width / 2;
         int centerY = height / 2;
 
@@ -210,7 +229,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
 
             centerPoint.setLocation(centerX, centerY);
-            SwingUtilities.convertPointToScreen(centerPoint, raycasting);
+            // Conversion relative à la fenêtre
+            SwingUtilities.convertPointToScreen(centerPoint, window);
             robot.mouseMove(centerPoint.x, centerPoint.y);
 
             input.setMouseX(centerX);
@@ -240,20 +260,20 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private void toggleMouseCapture(boolean capture) {
         mouseCaptured = capture;
         if (mouseCaptured) {
-            raycasting.getContentPane().setCursor(blankCursor);
+            window.setCursor(blankCursor);
             recenterMouse();
         } else {
-            raycasting.getContentPane().setCursor(defaultCursor);
+            window.setCursor(defaultCursor);
         }
     }
 
     private void recenterMouse() {
-        if (raycasting.isShowing()) {
-            centerPoint.setLocation(raycasting.getWidth() / 2, raycasting.getHeight() / 2);
-            SwingUtilities.convertPointToScreen(centerPoint, raycasting);
+        if (window.isVisible()) {
+            centerPoint.setLocation(window.getWidth() / 2, window.getHeight() / 2);
+            SwingUtilities.convertPointToScreen(centerPoint, window);
             robot.mouseMove(centerPoint.x, centerPoint.y);
-            input.setMouseX(raycasting.getWidth() / 2);
-            input.setMouseY(raycasting.getHeight() / 2);
+            input.setMouseX(window.getWidth() / 2);
+            input.setMouseY(window.getHeight() / 2);
         }
     }
 
@@ -262,7 +282,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             String playerId = entry.getKey();
             Joueur remotePlayer = entry.getValue();
 
-            // Interpolation : lisser le mouvement du joueur distant
             remotePlayer.interpolate(delta);
 
             Sprite sprite = playerSprites.get(playerId);
@@ -275,13 +294,13 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
-        // Si le sprite n'existe pas encore, le créer maintenant
         synchronized (playerSprites) {
             if (!playerSprites.containsKey(playerId)) {
                 Joueur remotePlayer = network.getRemotePlayer(playerId);
                 if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
                     Sprite playerSprite = new Sprite(x, y, PLAYER_SPRITE_PATH, playerId);
                     playerSprites.put(playerId, playerSprite);
+                    // Ajout du sprite au moteur de rendu (Raycasting)
                     raycasting.addSprite(playerSprite);
                 }
             }
@@ -290,7 +309,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     @Override
     public void onPlayerJoin(String playerId) {
-        // Éviter les doublons avec synchronisation
         synchronized (playerSprites) {
             if (playerSprites.containsKey(playerId)) {
                 return;
@@ -299,17 +317,18 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
             Joueur remotePlayer = network.getRemotePlayer(playerId);
             if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
                 Sprite playerSprite = new Sprite(
-                    remotePlayer.getX(),
-                    remotePlayer.getY(),
-                    PLAYER_SPRITE_PATH,
-                    playerId
+                        remotePlayer.getX(),
+                        remotePlayer.getY(),
+                        PLAYER_SPRITE_PATH,
+                        playerId
                 );
                 playerSprites.put(playerId, playerSprite);
                 raycasting.addSprite(playerSprite);
             }
         }
 
-        raycasting.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
+        // Log sur la fenêtre
+        window.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         network.sendPlayerPositionNow();
     }
 
@@ -321,7 +340,8 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         }
         if (sprite != null) {
             raycasting.removeSprite(sprite);
-            raycasting.addLogMessage(playerId + " a quitté la partie", Color.RED);
+            // Log sur la fenêtre
+            window.addLogMessage(playerId + " a quitté la partie", Color.RED);
         }
     }
 
@@ -329,9 +349,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         running = false;
     }
 
-    /**
-     * Obtenir l'adresse IP locale de la machine (pas localhost)
-     */
     private static String getLocalIPAddress() {
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -347,7 +364,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
                     }
                 }
             }
-        } catch (Exception _) {
+        } catch (Exception e) {
             // Ignorer
         }
         return "localhost";
@@ -358,7 +375,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
         System.out.println("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
 
-        // Afficher l'IP locale
         String localIP = getLocalIPAddress();
         System.out.println("Votre IP locale: " + localIP);
         System.out.println("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
