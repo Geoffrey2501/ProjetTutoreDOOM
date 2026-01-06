@@ -5,10 +5,11 @@ import java.util.ArrayList;
 public class RRT {
     private Map map;
 
-    private int MAX_ITERATIONS = 1000;
+    private int MAX_ITERATIONS = 2000;
 
     private static final int DEFAULT_MAX_DISTANCE_POINT = 50;
     private static final int RAYON_RECHERCHE = 80;  // Rayon pour rewiring RRT*
+    private int rayonMonstre = Monstre.RAYON;  // Rayon du monstre pour les collisions
 
     private ArrayList<Noeud> noeuds;
     private Noeud debut;
@@ -17,6 +18,12 @@ public class RRT {
     public RRT(Map map) {
         this.map = map;
         this.noeuds = new ArrayList<>();
+    }
+
+    public RRT(Map map, int rayonMonstre) {
+        this.map = map;
+        this.noeuds = new ArrayList<>();
+        this.rayonMonstre = rayonMonstre;
     }
 
     public Noeud trouverChemin(int startX, int startY, int endX, int endY) {
@@ -61,8 +68,8 @@ public class RRT {
             //vérifier si on peut atteindre la fin
             double distanceFin = calculerDistance(nouveau, fin);
             if (distanceFin <= DEFAULT_MAX_DISTANCE_POINT) {
-                // Vérifier que le segment ne traverse pas un mur
-                if (!map.traverseMur(nouveau.getX(), nouveau.getY(), fin.getX(), fin.getY())) {
+                // Vérifier que le segment ne traverse pas un mur (avec le rayon du monstre)
+                if (!map.traverseMurAvecRayon(nouveau.getX(), nouveau.getY(), fin.getX(), fin.getY(), rayonMonstre)) {
                     double coutViaNouveau = nouveau.getCout() + distanceFin;
                     if (meilleurVersLaFin == null || coutViaNouveau < fin.getCout()) {
                         fin.setParent(nouveau);
@@ -108,13 +115,13 @@ public class RRT {
             newY = (int) (depuis.getY() + (dy / distance) * DEFAULT_MAX_DISTANCE_POINT);
         }
 
-        // Vérifier si le nouveau nœud est dans un mur
-        if (map.estDansMur(newX, newY)) {
+        // Vérifier si le nouveau nœud est dans un mur (avec le rayon du monstre)
+        if (map.estDansMurAvecRayon(newX, newY, rayonMonstre)) {
             return null;
         }
 
-        // Vérifier si le segment traverse un mur
-        if (map.traverseMur(depuis.getX(), depuis.getY(), newX, newY)) {
+        // Vérifier si le segment traverse un mur (avec le rayon du monstre)
+        if (map.traverseMurAvecRayon(depuis.getX(), depuis.getY(), newX, newY, rayonMonstre)) {
             return null;
         }
 
@@ -132,8 +139,8 @@ public class RRT {
         for (Noeud n : noeuds) {
             double distance = calculerDistance(n, nouveau);
             if (distance <= RAYON_RECHERCHE) {
-                // Vérifier que le segment ne traverse pas un mur
-                if (!map.traverseMur(n.getX(), n.getY(), nouveau.getX(), nouveau.getY())) {
+                // Vérifier que le segment ne traverse pas un mur (avec le rayon du monstre)
+                if (!map.traverseMurAvecRayon(n.getX(), n.getY(), nouveau.getX(), nouveau.getY(), rayonMonstre)) {
                     double coutPotentiel = n.getCout() + distance;
                     if (coutPotentiel < meilleurCout) {
                         meilleurCout = coutPotentiel;
@@ -151,8 +158,8 @@ public class RRT {
             if (n != nouveau && n != debut) {
                 double distance = calculerDistance(nouveau, n);
                 if (distance <= RAYON_RECHERCHE) {
-                    // Vérifier que le segment ne traverse pas un mur
-                    if (!map.traverseMur(nouveau.getX(), nouveau.getY(), n.getX(), n.getY())) {
+                    // Vérifier que le segment ne traverse pas un mur (avec le rayon du monstre)
+                    if (!map.traverseMurAvecRayon(nouveau.getX(), nouveau.getY(), n.getX(), n.getY(), rayonMonstre)) {
                         double nouveauCout = nouveau.getCout() + distance;
                         if (nouveauCout < n.getCout()) {
                             // Reconnecter n via nouveau (meilleur chemin trouvé)
@@ -174,7 +181,7 @@ public class RRT {
             do {
                 randX = (int) (Math.random() * map.getLargeur());
                 randY = (int) (Math.random() * map.getHauteur());
-            } while (map.estDansMur(randX, randY));
+            } while (map.estDansMurAvecRayon(randX, randY, rayonMonstre));
         }
         return new int[] {randX, randY};
     }

@@ -98,4 +98,34 @@ public class Mur {
         // Le segment traverse le rectangle si on arrive ici
         return true;
     }
+
+    /**
+     * Vérifie si un cercle intersecte le mur (rectangle).
+     * Trouve le point le plus proche du centre du cercle sur le rectangle
+     * et vérifie si la distance est inférieure au rayon.
+     *
+     * @param cx coordonnée X du centre du cercle
+     * @param cy coordonnée Y du centre du cercle
+     * @param rayon rayon du cercle
+     * @return true si le cercle touche ou chevauche le mur
+     */
+    public boolean cercleIntersecte(int cx, int cy, int rayon) {
+        // Bornes du rectangle
+        int minX = Math.min(this.x1, this.x2);
+        int maxX = Math.max(this.x1, this.x2);
+        int minY = Math.min(this.y1, this.y2);
+        int maxY = Math.max(this.y1, this.y2);
+
+        // Trouver le point le plus proche du centre sur le rectangle
+        int closestX = Math.max(minX, Math.min(cx, maxX));
+        int closestY = Math.max(minY, Math.min(cy, maxY));
+
+        // Calculer la distance entre le centre et ce point
+        int distanceX = cx - closestX;
+        int distanceY = cy - closestY;
+        double distanceCarree = distanceX * distanceX + distanceY * distanceY;
+
+        // Le cercle intersecte si la distance est inférieure au rayon
+        return distanceCarree <= (rayon * rayon);
+    }
 }

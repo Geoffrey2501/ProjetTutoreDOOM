@@ -8,6 +8,7 @@ import java.util.List;
  * et Steering Behavior pour des mouvements naturels.
  */
 public class Monstre {
+    public static final int RAYON = 0;  // Rayon du monstre pour les collisions
     private double x;
     private double y;
     private final SteeringBehavior steering;
