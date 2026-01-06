@@ -11,6 +11,8 @@ public class RRTVisualisation extends JPanel {
     private final List<Noeud> chemin;
     private final Noeud debut;
     private final Noeud fin;
+    private Monstre monstre;
+    private javax.swing.Timer animationTimer;
 
     public RRTVisualisation(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin) {
         this.map = map;
@@ -19,6 +21,24 @@ public class RRTVisualisation extends JPanel {
         this.fin = fin;
         this.chemin = trouverChemin(debut, fin);
         setPreferredSize(new Dimension(map.getLargeur(), map.getHauteur()));
+    }
+
+    public RRTVisualisation(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin, Monstre monstre) {
+        this(map, noeuds, debut, fin);
+        this.monstre = monstre;
+    }
+
+    public void startAnimation() {
+        if (monstre == null) return;
+        animationTimer = new javax.swing.Timer(16, e -> {  // ~60 FPS
+            monstre.update();
+            repaint();
+            if (monstre.isArrived()) {
+                animationTimer.stop();
+                System.out.println("Monstre arrivé à destination !");
+            }
+        });
+        animationTimer.start();
     }
 
     // Trouver le chemin du début à la fin via les parents (RRT*)
@@ -101,6 +121,41 @@ public class RRTVisualisation extends JPanel {
         if (!chemin.isEmpty() && fin != null) {
             g2d.drawString("Coût: " + String.format("%.1f", fin.getCout()), 10, 60);
         }
+
+        // Dessiner le monstre avec Steering Behavior
+        if (monstre != null) {
+            drawMonstre(g2d);
+        }
+    }
+
+    private void drawMonstre(Graphics2D g2d) {
+        int mx = (int) monstre.getX();
+        int my = (int) monstre.getY();
+        double rotation = monstre.getRotation();
+
+        // Dessiner le corps du monstre (cercle violet)
+        g2d.setColor(new Color(128, 0, 128));
+        g2d.fillOval(mx - 12, my - 12, 24, 24);
+
+        // Dessiner la direction (flèche)
+        g2d.setColor(Color.YELLOW);
+        g2d.setStroke(new BasicStroke(3));
+        int arrowLength = 20;
+        int arrowX = (int) (mx + Math.cos(rotation) * arrowLength);
+        int arrowY = (int) (my + Math.sin(rotation) * arrowLength);
+        g2d.drawLine(mx, my, arrowX, arrowY);
+
+        // Dessiner le waypoint cible actuel
+        Noeud currentWaypoint = monstre.getCurrentWaypoint();
+        if (currentWaypoint != null) {
+            g2d.setColor(new Color(255, 0, 255, 100));
+            g2d.fillOval(currentWaypoint.getX() - 8, currentWaypoint.getY() - 8, 16, 16);
+        }
+
+        // Afficher la vitesse du monstre
+        g2d.setColor(Color.BLACK);
+        g2d.drawString(String.format("Vitesse: %.2f", monstre.getSpeed()), 10, 80);
+        g2d.drawString(String.format("Waypoint: %d/%d", monstre.getWaypointIndex() + 1, monstre.getChemin().size()), 10, 100);
     }
 
     public static void afficher(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin) {
@@ -111,6 +166,19 @@ public class RRTVisualisation extends JPanel {
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
+        });
+    }
+
+    public static void afficherAvecMonstre(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin, Monstre monstre) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame frame = new JFrame("Visualisation RRT* + Steering Behavior");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            RRTVisualisation panel = new RRTVisualisation(map, noeuds, debut, fin, monstre);
+            frame.add(panel);
+            frame.pack();
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+            panel.startAnimation();
         });
     }
 }
