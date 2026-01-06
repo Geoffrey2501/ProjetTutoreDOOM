@@ -45,9 +45,16 @@ public class RRTVisualisation extends JPanel {
         g2d.setColor(Color.WHITE);
         g2d.fillRect(0, 0, getWidth(), getHeight());
 
-        // Dessiner les arêtes de l'arbre RRT (segments bleus bien visibles)
-        g2d.setColor(new Color(100, 150, 255));
-        g2d.setStroke(new BasicStroke(2));
+        // Dessiner les murs en noir (rectangles pleins)
+        g2d.setColor(Color.BLACK);
+        for (Mur mur : map.getMurs()) {
+            int x = Math.min(mur.x1, mur.x2);
+            int y = Math.min(mur.y1, mur.y2);
+            int w = Math.abs(mur.x2 - mur.x1);
+            int h = Math.abs(mur.y2 - mur.y1);
+            g2d.fillRect(x, y, w, h);
+        }
+
         // Dessiner l'arbre RRT* (via les parents) en gris
         g2d.setColor(new Color(180, 180, 180));
         g2d.setStroke(new BasicStroke(1));
