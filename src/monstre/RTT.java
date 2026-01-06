@@ -14,7 +14,7 @@ public class RTT {
     private Noeud debut;
     private Noeud fin;
 
-    public RTT(Map map, int maxDistancePoint) {
+    public RTT(Map map) {
         this.map = map;
         this.noeuds = new ArrayList<>();
     }
@@ -38,6 +38,11 @@ public class RTT {
             //Créer un nouveau nœud vers le point aléatoire
             Noeud nouveau = creerNoeudVers(plusProche, coordAleatoires[0], coordAleatoires[1]);
 
+            // Si le nœud est dans un mur ou le segment traverse un mur, on passe
+            if (nouveau == null) {
+                continue;
+            }
+
             //Trouver le meilleur parent dans le voisinage
             Noeud meilleurParent = trouverMeilleurParent(nouveau);
             if (meilleurParent == null) meilleurParent = plusProche;
@@ -56,16 +61,19 @@ public class RTT {
             //vérifier si on peut atteindre la fin
             double distanceFin = calculerDistance(nouveau, fin);
             if (distanceFin <= DEFAULT_MAX_DISTANCE_POINT) {
-                double coutViaNouveau = nouveau.getCout() + distanceFin;
-                if (meilleurVersLaFin == null || coutViaNouveau < fin.getCout()) {
-                    fin.setParent(nouveau);
-                    fin.setCout(coutViaNouveau);
-                    if (meilleurVersLaFin == null) {
-                        noeuds.add(fin);
-                        nouveau.ajouterVoisin(fin);
-                        fin.ajouterVoisin(nouveau);
+                // Vérifier que le segment ne traverse pas un mur
+                if (!map.traverseMur(nouveau.getX(), nouveau.getY(), fin.getX(), fin.getY())) {
+                    double coutViaNouveau = nouveau.getCout() + distanceFin;
+                    if (meilleurVersLaFin == null || coutViaNouveau < fin.getCout()) {
+                        fin.setParent(nouveau);
+                        fin.setCout(coutViaNouveau);
+                        if (meilleurVersLaFin == null) {
+                            noeuds.add(fin);
+                            nouveau.ajouterVoisin(fin);
+                            fin.ajouterVoisin(nouveau);
+                        }
+                        meilleurVersLaFin = nouveau;
                     }
-                    meilleurVersLaFin = nouveau;
                 }
             }
         }
@@ -91,14 +99,30 @@ public class RTT {
         double dy = versY - depuis.getY();
         double distance = Math.sqrt(dx * dx + dy * dy);
 
+        int newX, newY;
         if (distance <= DEFAULT_MAX_DISTANCE_POINT) {
-            return new Noeud(versX, versY);
+            newX = versX;
+            newY = versY;
+        } else {
+            newX = (int) (depuis.getX() + (dx / distance) * DEFAULT_MAX_DISTANCE_POINT);
+            newY = (int) (depuis.getY() + (dy / distance) * DEFAULT_MAX_DISTANCE_POINT);
         }
 
-        int newX = (int) (depuis.getX() + (dx / distance) * DEFAULT_MAX_DISTANCE_POINT);
-        int newY = (int) (depuis.getY() + (dy / distance) * DEFAULT_MAX_DISTANCE_POINT);
+        // Vérifier si le nouveau nœud est dans un mur
+        if (map.estDansMur(newX, newY)) {
+            return null;
+        }
+
+        // Vérifier si le segment traverse un mur
+        if (map.traverseMur(depuis.getX(), depuis.getY(), newX, newY)) {
+            return null;
+        }
+
         return new Noeud(newX, newY);
     }
+
+    // Vérifie si un segment traverse un mur
+
 
     // RRT* : Trouver le meilleur parent parmi les voisins
     private Noeud trouverMeilleurParent(Noeud nouveau) {
@@ -108,10 +132,13 @@ public class RTT {
         for (Noeud n : noeuds) {
             double distance = calculerDistance(n, nouveau);
             if (distance <= RAYON_RECHERCHE) {
-                double coutPotentiel = n.getCout() + distance;
-                if (coutPotentiel < meilleurCout) {
-                    meilleurCout = coutPotentiel;
-                    meilleurParent = n;
+                // Vérifier que le segment ne traverse pas un mur
+                if (!map.traverseMur(n.getX(), n.getY(), nouveau.getX(), nouveau.getY())) {
+                    double coutPotentiel = n.getCout() + distance;
+                    if (coutPotentiel < meilleurCout) {
+                        meilleurCout = coutPotentiel;
+                        meilleurParent = n;
+                    }
                 }
             }
         }
@@ -124,11 +151,14 @@ public class RTT {
             if (n != nouveau && n != debut) {
                 double distance = calculerDistance(nouveau, n);
                 if (distance <= RAYON_RECHERCHE) {
-                    double nouveauCout = nouveau.getCout() + distance;
-                    if (nouveauCout < n.getCout()) {
-                        // Reconnecter n via nouveau (meilleur chemin trouvé)
-                        n.setParent(nouveau);
-                        n.setCout(nouveauCout);
+                    // Vérifier que le segment ne traverse pas un mur
+                    if (!map.traverseMur(nouveau.getX(), nouveau.getY(), n.getX(), n.getY())) {
+                        double nouveauCout = nouveau.getCout() + distance;
+                        if (nouveauCout < n.getCout()) {
+                            // Reconnecter n via nouveau (meilleur chemin trouvé)
+                            n.setParent(nouveau);
+                            n.setCout(nouveauCout);
+                        }
                     }
                 }
             }
@@ -141,8 +171,10 @@ public class RTT {
             randX = endX;
             randY = endY;
         } else {
-            randX = (int) (Math.random() * map.getLargeur());
-            randY = (int) (Math.random() * map.getHauteur());
+            do {
+                randX = (int) (Math.random() * map.getLargeur());
+                randY = (int) (Math.random() * map.getHauteur());
+            } while (map.estDansMur(randX, randY));
         }
         return new int[] {randX, randY};
     }
