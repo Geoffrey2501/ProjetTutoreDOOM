@@ -1,0 +1,43 @@
+@startuml
+'Diagramme de séquence - Prise de dégâts Joueur en réseau P2P
+
+autonumber
+
+actor "Joueur Tireur" as Joueur
+participant "Client Local" as CL
+participant "Réseau P2P" as Net
+participant "Client Victime" as CV
+
+activate Joueur
+Joueur -> CL: Tire sur un ennemi
+activate CL
+
+CL -> CL: Vérifie munitions et cooldown
+CL -> CL: Détecte si tir touche
+
+CL -> CL: Joue animation de tir
+CL -> CL: Retire 1 munition
+
+alt Tir touché
+    CL -> Net: Envoie info du tir (cible, dégâts)
+    activate Net
+
+    Net -> CV: Transmet le tir
+    activate CV
+
+    CV -> CV: Vérifie validité du tir
+    CV -> CV: Applique les dégâts
+    CV -> CV: Joue animation et son de hit
+
+    CV -> Net: Confirme le tir reçu
+    Net -> CL: Affiche hitmarker
+
+    CV -> Net: Envoie nouveau PV
+    Net -> CL: Met à jour barre de vie
+
+    deactivate CV
+    deactivate Net
+end
+
+deactivate CL
+@enduml
