@@ -1,27 +1,47 @@
 package moteur_graphique.BSP;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class TestArbreBSP {
 
     public static void main(String[] args) {
-        // Création d'une liste de murs fictifs (forme d'une pièce simple)
-        Mur[] murs = new Mur[] {
-            // Mur du haut
-            new Mur(0, 0, 100, 0, "mur_haut"),
-            // Mur de droite
-            new Mur(100, 0, 100, 100, "mur_droit"),
-            // Mur du bas
-            new Mur(100, 100, 0, 100, "mur_bas"),
-            // Mur de gauche
-            new Mur(0, 100, 0, 0, "mur_gauche"),
-            // Mur intérieur diagonal
-            new Mur(25, 25, 75, 75, "mur_diagonal"),
-            // Mur intérieur horizontal
-            new Mur(50, 30, 90, 30, "mur_interieur")
-        };
+        MapMur map = new MapMur("assets/maps/mapBSP.txt");
 
-        // Construire l'arbre BSP
-        ArbreBSP arbre = new ArbreBSP();
-        MapMur map = new MapMur(murs);
-        NoeudBSP racine = arbre.construireBSP(map);
+        System.out.println("Murs chargés : " + map.getMurs().length);
+        for (Mur m : map.getMurs()) {
+            System.out.println(" -> " + m);
+        }
+
+        System.out.println("\n=== 3. CONSTRUCTION ARBRE BSP ===");
+        ArbreBSP bsp = new ArbreBSP();
+        NoeudBSP racine = bsp.construireBSP(map);
+
+        System.out.println("\n=== 4. AFFICHAGE DE L'ARBRE ===");
+        if (racine != null) {
+            afficherArbre(racine, "", "RACINE");
+        } else {
+            System.out.println("L'arbre est vide !");
+        }
+    }
+
+    /**
+     * Affiche l'arbre récursivement avec indentation
+     */
+    public static void afficherArbre(NoeudBSP noeud, String indent, String type) {
+        if (noeud == null) return;
+
+        // Affichage du noeud courant
+        System.out.println(indent + "[" + type + "] Séparateur : " + noeud.mur);
+
+        // Appel récursif pour les enfants
+        // On augmente l'indentation pour visualiser la profondeur
+        if (noeud.gauche != null) {
+            afficherArbre(noeud.gauche, indent + "    ", "GAUCHE (Devant)");
+        }
+
+        if (noeud.droit != null) {
+            afficherArbre(noeud.droit, indent + "    ", "DROITE (Derrière)");
+        }
     }
 }

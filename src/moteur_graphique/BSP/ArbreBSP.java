@@ -8,14 +8,14 @@ public class ArbreBSP {
     private NoeudBSP racine;
 
     //une fonction pour déterminer de quel côté un point est par rapport à une ligne
-    private int coterDuPoint(Mur murPartition, int pointX, int pointY) {
-        int dx = murPartition.x1 - murPartition.x0;
-        int dy = murPartition.y1 - murPartition.y0;
+    private int coterDuPoint(Mur murPartition, double pointX, double pointY) {
+        double dx = murPartition.x1 - murPartition.x0;
+        double dy = murPartition.y1 - murPartition.y0;
 
-        int px = pointX - murPartition.x0;
-        int py = pointY - murPartition.y0;
+        double px = pointX - murPartition.x0;
+        double py = pointY - murPartition.y0;
 
-        int produitCroise = dx * py - dy * px;
+        double produitCroise = dx * py - dy * px;
 
         if (produitCroise > 0) {
             return 1; // gauche
@@ -41,24 +41,24 @@ public class ArbreBSP {
     }
 
     //fonction pour calculer le point d'intersection entre deux murs
-    private int[] calculerIntersection(Mur murPartition, Mur murACouper) {
-        int denominateur = (murPartition.x0 - murPartition.x1) * (murACouper.y0 - murACouper.y1)
+    private double[] calculerIntersection(Mur murPartition, Mur murACouper) {
+        double denominateur = (murPartition.x0 - murPartition.x1) * (murACouper.y0 - murACouper.y1)
                 - (murPartition.y0 - murPartition.y1) * (murACouper.x0 - murACouper.x1);
 
-        int produit_12 = (murPartition.x0 * murPartition.y1 - murPartition.y0 * murPartition.x1);
-        int produit_34 = (murACouper.x0 * murACouper.y1 - murACouper.y0 * murACouper.x1);
+        double produit_12 = (murPartition.x0 * murPartition.y1 - murPartition.y0 * murPartition.x1);
+        double produit_34 = (murACouper.x0 * murACouper.y1 - murACouper.y0 * murACouper.x1);
 
-        int pointX = (produit_12 * (murACouper.x0 - murACouper.x1) - (murPartition.x0 - murPartition.x1) * produit_34) / denominateur;
-        int pointY = (produit_12 * (murACouper.y0 - murACouper.y1) - (murPartition.y0 - murPartition.y1) * produit_34) / denominateur;
+        double pointX = (produit_12 * (murACouper.x0 - murACouper.x1) - (murPartition.x0 - murPartition.x1) * produit_34) / denominateur;
+        double pointY = (produit_12 * (murACouper.y0 - murACouper.y1) - (murPartition.y0 - murPartition.y1) * produit_34) / denominateur;
 
-        return new int[]{pointX, pointY};
+        return new double[]{pointX, pointY};
     }
 
     //fonction pour couper un mur en deux à partir d'un mur de partition
     private Mur[] couperMur(Mur murPartition, Mur murACouper) {
-        int[] intersection = calculerIntersection(murPartition, murACouper);
-        int pointIntersectionX = intersection[0];
-        int pointIntersectionY = intersection[1];
+        double[] intersection = calculerIntersection(murPartition, murACouper);
+        double pointIntersectionX = intersection[0];
+        double pointIntersectionY = intersection[1];
 
         Mur mur1 = new Mur(murACouper.x0, murACouper.y0, pointIntersectionX, pointIntersectionY);
         Mur mur2 = new Mur(pointIntersectionX, pointIntersectionY, murACouper.x1, murACouper.y1);

@@ -1,10 +1,10 @@
 package moteur_graphique.BSP;
 
 public class Mur {
-    public int x0, y0, x1, y1;
+    public double x0, y0, x1, y1;
     public String texture;
 
-    public Mur(int x0, int y0, int x1, int y1, String texture) {
+    public Mur(double x0, double y0, double x1, double y1, String texture) {
         this.x0 = x0;
         this.y0 = y0;
         this.x1 = x1;
@@ -12,7 +12,7 @@ public class Mur {
         this.texture = texture;
     }
 
-    public Mur(int x0, int y0, int x1, int y1) {
+    public Mur(double x0, double y0, double x1, double y1) {
         this.x0 = x0;
         this.y0 = y0;
         this.x1 = x1;
@@ -20,8 +20,13 @@ public class Mur {
         this.texture = "";
     }
 
-    public boolean estDansMur(int x, int y) {
+    public boolean estDansMur(double x, double y) {
         return x>= Math.min(x0, x1) && x <= Math.max(x0, x1) &&
                 y >= Math.min(y0, y1) && y <= Math.max(y0, y1);
+    }
+
+    @Override
+    public String toString() {
+        return "Mur (" + x0 + "," + y0 + " -> " + x1 + "," + y1 + ") [" + texture + "]";
     }
 }
