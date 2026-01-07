@@ -97,10 +97,24 @@ public class ArbreBSP {
             } else if (classification == -1) {
                 mursDroite.add(mur);
             } else if (classification == 0) {
-                //couper le mur en deux
+                // On coupe le mur
                 Mur[] mursCoupees = couperMur(murPartition, mur);
-                mursGauche.add(mursCoupees[0]);
-                mursDroite.add(mursCoupees[1]);
+
+                // On vérifie où se trouve le DEBUT du mur d'origine
+                int coteDepart = coterDuPoint(murPartition, mur.x0, mur.y0);
+
+                if (coteDepart == 1) {
+                    // Le mur partait de la GAUCHE vers la DROITE
+                    mursGauche.add(mursCoupees[0]); // Le début reste à gauche
+                    mursDroite.add(mursCoupees[1]); // La fin va à droite
+                } else if (coteDepart == -1) {
+                    // Le mur partait de la DROITE vers la GAUCHE
+                    mursDroite.add(mursCoupees[0]); // Le début reste à droite
+                    mursGauche.add(mursCoupees[1]); // La fin va à gauche
+                }
+                // Note: Si coteDepart est 0, c'est un cas dégénéré (colinéaire),
+                // mais "classerMur" aurait dû renvoyer autre chose que 0 globalement
+                // si le mur était totalement aligné.
             }
         }
 
