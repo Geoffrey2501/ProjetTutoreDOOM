@@ -6,8 +6,10 @@ import java.util.List;
 public class ArbreBSP {
 
     private NoeudBSP racine;
+    // Tolérance pour éviter les erreurs de virgule flottante
+    private static final double EPSILON = 1e-5;
 
-    //une fonction pour déterminer de quel côté un point est par rapport à une ligne
+    // Détermine de quel côté un point est par rapport à une ligne
     private int coterDuPoint(Mur murPartition, double pointX, double pointY) {
         double dx = murPartition.x1 - murPartition.x0;
         double dy = murPartition.y1 - murPartition.y0;
@@ -17,33 +19,48 @@ public class ArbreBSP {
 
         double produitCroise = dx * py - dy * px;
 
-        if (produitCroise > 0) {
+        if (produitCroise > EPSILON) {
             return 1; // gauche
-        } else if (produitCroise < 0) {
+        } else if (produitCroise < -EPSILON) {
             return -1; // droite
         } else {
-            return 0; // sur ligne
+            return 0; // sur la ligne (à epsilon près)
         }
     }
 
-    //une fonction pour dire si un mur est à gauche, droite, ou coupé par le mur
+    // Classe le mur : 1 (Gauche), -1 (Droite), 0 (Coupe)
     private int classerMur(Mur murPartition, Mur murAClasser) {
         int cote0 = coterDuPoint(murPartition, murAClasser.x0, murAClasser.y0);
         int cote1 = coterDuPoint(murPartition, murAClasser.x1, murAClasser.y1);
 
-        if ((cote0 == 1 && cote1 == 1) || (cote0 == 0 && cote1 == 1) || (cote0 == 1 && cote1 == 0)) {
-            return 1; // gauche
-        } else if ((cote0 == -1 && cote1 == -1) || (cote0 == 0 && cote1 == -1) || (cote0 == -1 && cote1 == 0)) {
-            return -1; // droite
-        } else {
-            return 0; // coupe
+        // 1. CAS CRITIQUE AJOUTÉ : Le mur est aligné (colinéaire)
+        if (cote0 == 0 && cote1 == 0) {
+            // On décide arbitrairement de le mettre à GAUCHE (ou droite, peu importe, mais pas COUPER)
+            // Cela empêche le mur de disparaître.
+            return 1;
         }
+
+        // 2. Si un point est sur la ligne, on utilise l'autre point pour décider
+        if (cote0 == 0) return cote1;
+        if (cote1 == 0) return cote0;
+
+        // 3. Si les deux sont du même côté
+        if (cote0 == cote1) {
+            return cote0;
+        }
+
+        // 4. Sinon, ils sont de côtés opposés -> IL FAUT COUPER
+        return 0;
     }
 
-    //fonction pour calculer le point d'intersection entre deux murs
     private double[] calculerIntersection(Mur murPartition, Mur murACouper) {
         double denominateur = (murPartition.x0 - murPartition.x1) * (murACouper.y0 - murACouper.y1)
                 - (murPartition.y0 - murPartition.y1) * (murACouper.x0 - murACouper.x1);
+
+        // Sécurité anti-crash si jamais on essaie de couper deux murs parallèles (ne devrait plus arriver avec le fix classerMur)
+        if (Math.abs(denominateur) < EPSILON) {
+            return new double[]{murACouper.x0, murACouper.y0};
+        }
 
         double produit_12 = (murPartition.x0 * murPartition.y1 - murPartition.y0 * murPartition.x1);
         double produit_34 = (murACouper.x0 * murACouper.y1 - murACouper.y0 * murACouper.x1);
@@ -54,40 +71,24 @@ public class ArbreBSP {
         return new double[]{pointX, pointY};
     }
 
-    //fonction pour couper un mur en deux à partir d'un mur de partition
     private Mur[] couperMur(Mur murPartition, Mur murACouper) {
         double[] intersection = calculerIntersection(murPartition, murACouper);
-        double pointIntersectionX = intersection[0];
-        double pointIntersectionY = intersection[1];
-
-        Mur mur1 = new Mur(murACouper.x0, murACouper.y0, pointIntersectionX, pointIntersectionY);
-        Mur mur2 = new Mur(pointIntersectionX, pointIntersectionY, murACouper.x1, murACouper.y1);
-
+        // On crée les deux nouveaux murs
+        Mur mur1 = new Mur(murACouper.x0, murACouper.y0, intersection[0], intersection[1]);
+        Mur mur2 = new Mur(intersection[0], intersection[1], murACouper.x1, murACouper.y1);
         return new Mur[]{mur1, mur2};
     }
 
-    //fonction récursive pour construire l'arbre BSP
     public NoeudBSP construireBSP(MapMur map) {
-        //si c’est vide on a fini
-        if (map.getMurs().length == 0) {
-            return null;
-        }
+        if (map.getMurs().length == 0) return null;
 
-        //choisir un mur
-        //on choisit le premier, mais on peut imaginer en choisir un autre … c’est un peu aléatoire ici,
-        //il faut tester plusieur cas et voir si on arrive à un arbre avec moins de noeud (comme doom)
         Mur murPartition = map.getMurs()[0];
-
-        //créer le nœud
         NoeudBSP noeud = new NoeudBSP(murPartition);
         noeud.mur = murPartition;
 
-        //listes pour les murs à gauche et à droite, vides au début
         List<Mur> mursGauche = new ArrayList<>();
         List<Mur> mursDroite = new ArrayList<>();
 
-        //parcourir les autres murs (on démarre à 1 pour ignorer le mur parent, ATTENTION si on
-        //utilise un autre mur que le premier comme parent)
         for (int i = 1; i < map.getMurs().length; i++) {
             Mur mur = map.getMurs()[i];
             int classification = classerMur(murPartition, mur);
@@ -96,37 +97,38 @@ public class ArbreBSP {
                 mursGauche.add(mur);
             } else if (classification == -1) {
                 mursDroite.add(mur);
-            } else if (classification == 0) {
-                // On coupe le mur
+            } else {
+                // CAS COUPURE (classification == 0)
                 Mur[] mursCoupees = couperMur(murPartition, mur);
-
-                // On vérifie où se trouve le DEBUT du mur d'origine
                 int coteDepart = coterDuPoint(murPartition, mur.x0, mur.y0);
 
-                if (coteDepart == 1) {
-                    // Le mur partait de la GAUCHE vers la DROITE
-                    mursGauche.add(mursCoupees[0]); // Le début reste à gauche
-                    mursDroite.add(mursCoupees[1]); // La fin va à droite
-                } else if (coteDepart == -1) {
-                    // Le mur partait de la DROITE vers la GAUCHE
-                    mursDroite.add(mursCoupees[0]); // Le début reste à droite
-                    mursGauche.add(mursCoupees[1]); // La fin va à gauche
+                if (coteDepart == 1) { // Début à Gauche
+                    mursGauche.add(mursCoupees[0]);
+                    mursDroite.add(mursCoupees[1]);
+                } else if (coteDepart == -1) { // Début à Droite
+                    mursDroite.add(mursCoupees[0]);
+                    mursGauche.add(mursCoupees[1]);
+                } else {
+                    // SAUVETAGE : Si le point de départ est pile sur la ligne (coteDepart == 0)
+                    // On regarde le point d'arrivée pour savoir l'orientation
+                    int coteArrivee = coterDuPoint(murPartition, mur.x1, mur.y1);
+                    if (coteArrivee == 1) { // Fin à Gauche -> Début (0) considéré Droite relative ? Non, juste l'inverse.
+                        // Si Fin est Gauche, alors Début est "Neutre/Droite", donc :
+                        mursDroite.add(mursCoupees[0]); // Partie "sur la ligne" ou presque
+                        mursGauche.add(mursCoupees[1]);
+                    } else {
+                        mursGauche.add(mursCoupees[0]);
+                        mursDroite.add(mursCoupees[1]);
+                    }
                 }
-                // Note: Si coteDepart est 0, c'est un cas dégénéré (colinéaire),
-                // mais "classerMur" aurait dû renvoyer autre chose que 0 globalement
-                // si le mur était totalement aligné.
             }
         }
 
-        //construire récursivement les sous-arbres
         noeud.gauche = construireBSP(new MapMur(mursGauche.toArray(new Mur[0])));
         noeud.droit = construireBSP(new MapMur(mursDroite.toArray(new Mur[0])));
-
         this.racine = noeud;
         return noeud;
     }
 
-    public NoeudBSP getRacine() {
-        return racine;
-    }
+    public NoeudBSP getRacine() { return racine; }
 }
