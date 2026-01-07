@@ -1,9 +1,8 @@
 package moteur_graphique.raycasting;
 
 import moteur_graphique.GameRenderer; // Importer l'interface
-import prototype_raycasting.Joueur;
-import prototype_raycasting.Map;
-import prototype_raycasting.Sprite;
+import entite.Joueur;
+import entite.Sprite;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -21,7 +20,7 @@ public class Raycasting implements GameRenderer {
 
     private static final Logger LOGGER = Logger.getLogger(Raycasting.class.getName());
 
-    private Map map;
+    private MapBool map;
     private Joueur joueur;
     private static final int FOV = 60;
     private static final int NUM_RAYS = 1000;
@@ -55,7 +54,7 @@ public class Raycasting implements GameRenderer {
         double rayDirX; double rayDirY;
     }
 
-    public Raycasting(Map m, Joueur j) {
+    public Raycasting(MapBool m, Joueur j) {
         this.map = m;
         this.joueur = j;
         loadWallTexture();

@@ -1,7 +1,7 @@
 package game;
 
 import Reseau.GestionConnection;
-import prototype_raycasting.Joueur;
+import entite.Joueur;
 
 import java.util.Map;
 import java.util.Set;

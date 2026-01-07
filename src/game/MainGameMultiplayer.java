@@ -1,9 +1,10 @@
 package game;
 
 import moteur_graphique.Window;
+import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
-import prototype_raycasting.Joueur;
-import prototype_raycasting.Sprite;
+import entite.Joueur;
+import entite.Sprite;
 
 import javax.swing.*;
 import java.awt.*;
@@ -19,7 +20,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     private static final Logger LOGGER = Logger.getLogger(MainGameMultiplayer.class.getName());
 
-    private final prototype_raycasting.Map map;
+    private final MapBool map;
     private final Joueur joueur;
 
     //séparation : Window pour l'UI/Fenêtre, GameRenderer pour le calcul/rendu
@@ -46,7 +47,7 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private final Point centerPoint;
 
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
-        map = new prototype_raycasting.Map("assets/maps/map.txt");
+        map = new MapBool("assets/maps/map.txt");
         joueur = new Joueur(playerId, 2.0, 2.0, 0.0);
         input = new Input();
         playerSprites = new ConcurrentHashMap<>();
