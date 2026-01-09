@@ -1,4 +1,4 @@
-package prototype_raycasting;
+package moteur_graphique.raycasting;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -6,13 +6,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Map {
+public class MapBool {
     private int width;
     private int height;
 
     private boolean[][] grid; // 1 = mur | 0 = vide
 
-    public Map () {
+    public MapBool() {
         width = 10;
         height = 10;
         grid = new boolean[height][width];
@@ -27,7 +27,7 @@ public class Map {
         }
     }
 
-    public Map(String fichier) {
+    public MapBool(String fichier) {
         loadMap(fichier);
     }
 
