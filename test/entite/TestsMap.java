@@ -1,5 +1,6 @@
-package prototype_raycasting;
+package entite;
 
+import moteur_graphique.raycasting.MapBool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +31,7 @@ public class TestsMap {
             "11111";
         createTempFile(TEST_FILE, content);
 
-        Map map = new Map(TEST_FILE);
+        MapBool map = new MapBool(TEST_FILE);
 
         assertEquals(5, map.getWIDTH(), "La largeur de la carte devrait être 5");
         assertEquals(4, map.getHEIGHT(), "La hauteur de la carte devrait être 4");
@@ -49,7 +50,7 @@ public class TestsMap {
             "111";
         createTempFile(TEST_FILE, content);
 
-        Map map = new Map(TEST_FILE);
+        MapBool map = new MapBool(TEST_FILE);
 
         // Test des murs internes
         assertTrue(map.isWall(0, 0), "isWall(0,0) devrait retourner true");
@@ -72,7 +73,7 @@ public class TestsMap {
         createTempFile(TEST_FILE, content);
 
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-            new Map(TEST_FILE);
+            new MapBool(TEST_FILE);
         });
 
         // On vérifie que le message d'erreur contient bien ce qu'on attend

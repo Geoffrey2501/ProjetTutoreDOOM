@@ -1,4 +1,4 @@
-package prototype_raycasting;
+package game;
 
 import java.awt.*;
 import java.awt.event.KeyAdapter;
