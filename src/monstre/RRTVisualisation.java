@@ -67,7 +67,7 @@ public class RRTVisualisation extends JPanel {
 
         // Dessiner les murs en noir (rectangles pleins)
         g2d.setColor(Color.BLACK);
-        for (Mur mur : map.getMurs()) {
+        for (MurTabBoolean mur : map.getMurs()) {
             int x = Math.min(mur.x1, mur.x2);
             int y = Math.min(mur.y1, mur.y2);
             int w = Math.abs(mur.x2 - mur.x1);
