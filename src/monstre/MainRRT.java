@@ -11,8 +11,8 @@ public class MainRRT {
         if (chemin != null) {
             System.out.println("Chemin trouvé !");
 
-            // Créer le monstre à la position de départ
-            Monstre monstre = new Monstre(30, 30);
+            // Créer le monstre à la position de départ avec la map pour les collisions
+            Monstre monstre = new Monstre(30, 30, map);
             monstre.setChemin(chemin);
 
             // Affichage visuel avec animation du monstre

@@ -5,7 +5,7 @@ package monstre;
  * pour des déplacements naturels et fluides.
  */
 public class SteeringBehavior {
-    private double maxVelocity = 5.0;
+    private double maxVelocity = 10.0;
     private double maxForce = 0.2;
     private double arrivalRadius = 15.0;
     private double slowingRadius = 60.0;

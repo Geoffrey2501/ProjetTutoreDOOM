@@ -28,6 +28,7 @@ public class RRTVisualisation extends JPanel {
         this.monstre = monstre;
     }
 
+
     public void startAnimation() {
         if (monstre == null) return;
         animationTimer = new javax.swing.Timer(16, e -> {  // ~60 FPS

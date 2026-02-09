@@ -8,7 +8,7 @@ import java.util.List;
  * et Steering Behavior pour des mouvements naturels.
  */
 public class Monstre {
-    public static final int RAYON = 0;  // Rayon du monstre pour les collisions
+    public static final int RAYON = 5;  // Rayon du monstre pour les collisions
     private double x;
     private double y;
     private final SteeringBehavior steering;
@@ -16,12 +16,18 @@ public class Monstre {
     private int waypointIndex = 0;
     private double waypointTolerance = 15.0;
     private boolean arrived = false;
+    private Map map;  // Référence à la map pour vérifier les collisions
 
     public Monstre(double x, double y) {
         this.x = x;
         this.y = y;
         this.steering = new SteeringBehavior();
         this.chemin = new ArrayList<>();
+    }
+
+    public Monstre(double x, double y, Map map) {
+        this(x, y);
+        this.map = map;
     }
 
     /**
@@ -62,16 +68,33 @@ public class Monstre {
             target = chemin.get(waypointIndex);
         }
 
-        // Utiliser arrive pour le dernier waypoint, seek sinon
-        if (waypointIndex == chemin.size() - 1) {
-            steering.arrive(x, y, target.getX(), target.getY());
-        } else {
-            steering.seek(x, y, target.getX(), target.getY());
-        }
+        // Utiliser seek pour tous les waypoints
+        steering.seek(x, y, target.getX(), target.getY());
 
-        // Appliquer la vélocité
-        x += steering.getVelocityX();
-        y += steering.getVelocityY();
+        // Calculer la nouvelle position
+        double newX = x + steering.getVelocityX();
+        double newY = y + steering.getVelocityY();
+
+        // Vérifier les collisions avec la hitbox si la map est définie
+        if (map != null) {
+            // Vérifier si la nouvelle position est valide (pas dans un mur)
+            if (!collidesWithWall(newX, newY)) {
+                x = newX;
+                y = newY;
+            } else {
+                // Essayer de glisser le long du mur
+                if (!collidesWithWall(newX, y)) {
+                    x = newX;
+                } else if (!collidesWithWall(x, newY)) {
+                    y = newY;
+                }
+                // Sinon, on reste sur place
+            }
+        } else {
+            // Pas de map, appliquer la vélocité directement
+            x = newX;
+            y = newY;
+        }
 
         // Vérifier si arrivé à destination
         if (waypointIndex == chemin.size() - 1 && distance < 5) {
@@ -103,8 +126,33 @@ public class Monstre {
         this.waypointTolerance = tolerance;
     }
 
+    public void setMap(Map map) {
+        this.map = map;
+    }
+
     public SteeringBehavior getSteering() {
         return steering;
+    }
+
+    /**
+     * Vérifie si la position donnée entre en collision avec un mur
+     * en tenant compte du rayon du monstre.
+     */
+    private boolean collidesWithWall(double posX, double posY) {
+        if (map == null) return false;
+
+        // Vérifier plusieurs points autour du cercle de la hitbox
+        int numPoints = 8;
+        for (int i = 0; i < numPoints; i++) {
+            double angle = 2 * Math.PI * i / numPoints;
+            int checkX = (int) (posX + RAYON * Math.cos(angle));
+            int checkY = (int) (posY + RAYON * Math.sin(angle));
+            if (map.estDansMur(checkX, checkY)) {
+                return true;
+            }
+        }
+        // Vérifier aussi le centre
+        return map.estDansMur((int) posX, (int) posY);
     }
 }
 

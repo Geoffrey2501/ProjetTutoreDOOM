@@ -37,6 +37,7 @@ public class RRT {
 
         for (int i = 0; i < MAX_ITERATIONS; i += 1) {
 
+
             //Générer un point aléatoire
             int [] coordAleatoires = getCoordonneesAleatoires(endX, endY);
             //Trouver le nœud le plus proche
