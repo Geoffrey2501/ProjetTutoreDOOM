@@ -1,4 +1,4 @@
-package prototype_raycasting;
+package entite;
 
 import java.util.logging.Logger;
 

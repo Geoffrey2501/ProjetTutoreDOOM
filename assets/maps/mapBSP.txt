@@ -1,0 +1,4 @@
+0.0 0.0 100.0 0.0 brique_rouge.png
+100.0 0.0 100.0 100.0 brique_rouge.png
+100.0 100.0 0.0 100.0 brique_rouge.png
+0.0 100.0 0.0 0.0 brique_rouge.png
