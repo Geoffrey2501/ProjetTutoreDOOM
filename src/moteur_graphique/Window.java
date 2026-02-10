@@ -4,7 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Window extends JFrame {
@@ -51,8 +53,8 @@ public class Window extends JFrame {
         // Panel personnalisé pour le dessin
         panelDessin = new CanvasPanel();
         panelDessin.setBackground(Color.BLACK);
-        panelDessin.setFocusable(true); // Important pour les KeyListeners
-        panelDessin.requestFocus();
+        panelDessin.setFocusable(true);
+        disableFocusTraversal(panelDessin);
 
         add(panelDessin);
 
@@ -65,6 +67,14 @@ public class Window extends JFrame {
         });
 
         setVisible(true);
+        panelDessin.requestFocusInWindow();
+    }
+
+    private static void disableFocusTraversal(Component component) {
+        component.setFocusTraversalKeysEnabled(false);
+        Set<AWTKeyStroke> emptySet = new HashSet<>();
+        component.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, emptySet);
+        component.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, emptySet);
     }
 
     public void setRenderer(GameRenderer renderer) {
