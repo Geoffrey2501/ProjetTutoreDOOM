@@ -148,6 +148,8 @@ public class Serveur {
                 processPeerListMessage(message);
             } else if (message.startsWith("NEW_PEER:")) {
                 processNewPeerMessage(message);
+            } else if (message.startsWith("PEER_LEFT:")) {
+                processPeerLeftMessage(message);
             } else {
                 processLegacyMoveMessage(message, sender);
             }
@@ -192,6 +194,16 @@ public class Serveur {
 
             sender.setRemotePeerId(correctInfo.getPeerId());
             System.out.println("[" + nodeId + "] ✓ " + correctInfo.getPeerId() + " identifié et connecté.");
+
+            // Nettoyer les entrées temporaires (ex: "ip:port") qui pointent vers le même hôte/port
+            for (Map.Entry<String, PeerInfo> entry : knownPeers.entrySet()) {
+                PeerInfo info = entry.getValue();
+                if (!entry.getKey().equals(correctInfo.getPeerId())
+                        && info.getHost().equals(correctInfo.getHost())
+                        && info.getPort() == correctInfo.getPort()) {
+                    knownPeers.remove(entry.getKey());
+                }
+            }
 
             // On stocke la BONNE info dans knownPeers
             knownPeers.put(correctInfo.getPeerId(), correctInfo);
@@ -255,6 +267,15 @@ public class Serveur {
         } catch (Exception e) {}
     }
 
+    private void processPeerLeftMessage(String message) {
+        try {
+            String peerId = message.substring(10).trim();
+            if (peerId.isEmpty() || peerId.equals(nodeId)) return;
+            handlePeerLeft(peerId, false);
+        } catch (Exception e) {
+        }
+    }
+
     private void processLegacyMoveMessage(String message, GestionConnection sender) {
         try {
             String[] parts = message.split(":");
@@ -287,10 +308,22 @@ public class Serveur {
     public void removePeer(GestionConnection peer) {
         connectedPeers.remove(peer);
         String peerId = peer.getRemotePeerId();
-        if (peerId != null) onPeerDisconnected(peerId);
+        if (peerId != null) {
+            handlePeerLeft(peerId, true);
+        }
     }
 
     protected void onPeerDisconnected(String peerId) {
+    }
+
+    private void handlePeerLeft(String peerId, boolean broadcast) {
+        if (peerId == null || peerId.equals(nodeId)) return;
+        knownPeers.remove(peerId);
+        playerPositions.remove(peerId);
+        if (broadcast) {
+            broadcastToPeers("PEER_LEFT:" + peerId);
+        }
+        onPeerDisconnected(peerId);
     }
 
     public Map<String, int[]> getPlayerPositions() {
@@ -320,3 +353,4 @@ public class Serveur {
         } catch (IOException e) {}
     }
 }
+
