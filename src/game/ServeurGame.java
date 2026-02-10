@@ -65,9 +65,6 @@ public class ServeurGame extends Serveur {
             processGameMoveMessage(message, sender);
         } else {
             super.processMessageFromPeer(message, sender);
-            if (message.startsWith("HELLO:")) {
-                adapter.sendPlayerPositionTo(sender);
-            }
         }
     }
 
