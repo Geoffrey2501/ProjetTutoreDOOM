@@ -36,7 +36,7 @@ public class TestsMap {
         assertEquals(5, map.getWIDTH(), "La largeur de la carte devrait être 5");
         assertEquals(4, map.getHEIGHT(), "La hauteur de la carte devrait être 4");
 
-        boolean[][] grid = map.getMap();
+        boolean[][] grid = map.getGrid();
         assertTrue(grid[0][0], "Le coin (0,0) devrait être un mur");
         assertFalse(grid[1][1], "La case (1,1) devrait être vide");
         assertTrue(grid[2][2], "La case (2,2) devrait être un mur");
