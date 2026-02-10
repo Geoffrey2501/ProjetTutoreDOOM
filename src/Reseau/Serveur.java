@@ -122,19 +122,11 @@ public class Serveur {
         try {
             while (!serverSocket.isClosed()) {
                 Socket peerSocket = serverSocket.accept();
-                System.out.println("[" + nodeId + "] Connexion entrante acceptée de " + peerSocket.getInetAddress());
-
                 GestionConnection peerConnection = new GestionConnection(peerSocket, this);
                 connectedPeers.add(peerConnection);
                 executor.execute(peerConnection);
 
-                // IMPORTANT : S'identifier auprès du nouveau connecté
-                String helloMsg = "HELLO:" + nodeId + "@" + getLocalIPAddress() + ":" + port;
-                System.out.println("[" + nodeId + "] Envoi HELLO au nouveau connecté: " + helloMsg);
-                peerConnection.sendMessage(helloMsg);
-
-                // Envoyer la liste des pairs connus au nouveau connecté
-                System.out.println("[" + nodeId + "] Envoi PEER_LIST au nouveau connecté");
+                //IMPORTANT : Envoyer la liste des pairs connus au nouveau connecté
                 sendPeerListTo(peerConnection);
             }
         } catch (IOException e) {
