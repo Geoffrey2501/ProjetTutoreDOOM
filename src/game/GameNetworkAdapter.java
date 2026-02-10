@@ -81,40 +81,6 @@ public class GameNetworkAdapter {
     }
 
     /**
-     * Broadcast l'arrivée d'un nouveau joueur à tous les pairs
-     * @param playerId identifiant du nouveau joueur
-     */
-    public void broadcastPlayerJoin(String playerId) {
-        String message = "JOIN:" + playerId;
-        System.out.println("[NETWORK] Broadcasting JOIN: " + playerId);
-        serveur.broadcastToPeers(message);
-    }
-
-    /**
-     * Appelé quand on reçoit un message JOIN d'un autre pair
-     * @param playerId identifiant du joueur qui a rejoint
-     */
-    void onPlayerJoinReceived(String playerId) {
-        if (localPlayer != null && playerId.equals(localPlayer.getId())) {
-            return; // Ignorer si c'est nous-même
-        }
-
-        System.out.println("[NETWORK] Reçu JOIN pour: " + playerId);
-
-        // Ajouter le joueur s'il n'existe pas encore
-        synchronized (remotePlayers) {
-            if (!remotePlayers.containsKey(playerId)) {
-                Joueur newPlayer = new Joueur(playerId);
-                remotePlayers.put(playerId, newPlayer);
-                System.out.println("[NETWORK] Nouveau joueur ajouté (en attente de position): " + playerId);
-            }
-        }
-
-        // Envoyer notre position au nouveau joueur
-        sendPlayerPositionNow();
-    }
-
-    /**
      * Gérer la réception de la position d'un autre joueur
      * @param playerId identifiant du joueur
      * @param positionData données de position reçues
@@ -137,7 +103,6 @@ public class GameNetworkAdapter {
                 // Parser les coordonnées
                 if (!remotePlayer.fromNetworkString(positionData)) {
                     // Si le parsing échoue, ne pas ajouter ce joueur
-                    System.out.println("Erreur de parsing pour le joueur " + playerId + " avec les données: " + positionData);
                     return;
                 }
                 remotePlayers.put(playerId, remotePlayer);
@@ -155,8 +120,6 @@ public class GameNetworkAdapter {
         if (listener != null && remotePlayer.isPositionInitialized()) {
             if (isNewPlayer) {
                 listener.onPlayerJoin(playerId);
-                // Broadcaster l'arrivée du nouveau joueur aux autres pairs
-                broadcastPlayerJoin(playerId);
             }
             listener.onPlayerPositionUpdate(
                 playerId,

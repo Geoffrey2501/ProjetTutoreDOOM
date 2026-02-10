@@ -143,7 +143,6 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
         spriteManager.onPlayerPositionUpdate(playerId, x, y);
-
     }
 
     @Override
