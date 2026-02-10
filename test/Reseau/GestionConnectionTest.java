@@ -3,6 +3,7 @@ package Reseau;
 import org.junit.jupiter.api.*;
 import java.io.*;
 import java.net.*;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -491,6 +492,214 @@ public class GestionConnectionTest {
         assertTrue(positions.containsKey("Player2"));
         assertTrue(positions.containsKey("Player3"));
         assertTrue(connectionThread.isAlive());
+    }
+
+    // ==================== Tests de maillage complet à 3 joueurs ====================
+
+    @Test
+    @DisplayName("Test maillage complet à 3 joueurs - tous les joueurs se voient")
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void testFullMeshThreePlayers() throws InterruptedException, IOException {
+        // Créer 3 serveurs (nœuds P2P) simulant 3 joueurs
+        int portJ1 = testPort + 200;
+        int portJ2 = testPort + 201;
+        int portJ3 = testPort + 202;
+
+        Serveur serveurJ1 = new Serveur("J1", "localhost", portJ1);
+        Serveur serveurJ2 = new Serveur("J2", "localhost", portJ2);
+        Serveur serveurJ3 = new Serveur("J3", "localhost", portJ3);
+
+        try {
+            // Démarrer les 3 serveurs
+            serveurJ1.start();
+            serveurJ2.start();
+            serveurJ3.start();
+
+            Thread.sleep(200); // Attendre que les serveurs démarrent
+
+            // J2 se connecte à J1 (l'hôte)
+            serveurJ2.connectToNode("J1", "localhost", portJ1);
+            Thread.sleep(300);
+
+            // J3 se connecte à J1 (l'hôte)
+            serveurJ3.connectToNode("J1", "localhost", portJ1);
+            Thread.sleep(500); // Attendre la propagation de la PEER_LIST
+
+            // Chaque joueur envoie sa position
+            serveurJ1.movePlayer(100, 100);
+            serveurJ2.movePlayer(200, 200);
+            serveurJ3.movePlayer(300, 300);
+
+            Thread.sleep(500); // Attendre la propagation des positions
+
+            // Vérifier que J1 (l'hôte) voit J2 et J3
+            Map<String, int[]> positionsJ1 = serveurJ1.getPlayerPositions();
+            assertTrue(positionsJ1.containsKey("J1"), "J1 doit avoir sa propre position");
+            assertTrue(positionsJ1.containsKey("J2"), "J1 doit voir J2");
+            assertTrue(positionsJ1.containsKey("J3"), "J1 doit voir J3");
+
+            // Vérifier que J2 voit J1 et J3 (LE BUG POTENTIEL)
+            Map<String, int[]> positionsJ2 = serveurJ2.getPlayerPositions();
+            assertTrue(positionsJ2.containsKey("J2"), "J2 doit avoir sa propre position");
+            assertTrue(positionsJ2.containsKey("J1"), "J2 doit voir J1 (l'hôte)");
+            assertTrue(positionsJ2.containsKey("J3"), "J2 doit voir J3 (BUG si échoue: J2 ne voit que l'hôte)");
+
+            // Vérifier que J3 voit J1 et J2 (LE BUG POTENTIEL)
+            Map<String, int[]> positionsJ3 = serveurJ3.getPlayerPositions();
+            assertTrue(positionsJ3.containsKey("J3"), "J3 doit avoir sa propre position");
+            assertTrue(positionsJ3.containsKey("J1"), "J3 doit voir J1 (l'hôte)");
+            assertTrue(positionsJ3.containsKey("J2"), "J3 doit voir J2 (BUG si échoue: J3 ne voit que l'hôte)");
+
+        } finally {
+            serveurJ1.shutdown();
+            serveurJ2.shutdown();
+            serveurJ3.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("Test maillage complet - vérification des connexions bidirectionnelles")
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void testFullMeshBidirectionalConnections() throws InterruptedException {
+        int portJ1 = testPort + 210;
+        int portJ2 = testPort + 211;
+        int portJ3 = testPort + 212;
+
+        Serveur serveurJ1 = new Serveur("J1", "localhost", portJ1);
+        Serveur serveurJ2 = new Serveur("J2", "localhost", portJ2);
+        Serveur serveurJ3 = new Serveur("J3", "localhost", portJ3);
+
+        try {
+            serveurJ1.start();
+            serveurJ2.start();
+            serveurJ3.start();
+            Thread.sleep(200);
+
+            // J2 et J3 se connectent à J1
+            serveurJ2.connectToNode("J1", "localhost", portJ1);
+            serveurJ3.connectToNode("J1", "localhost", portJ1);
+            Thread.sleep(1000); // Attendre que le maillage complet se forme
+
+            // Vérifier le nombre de connexions de chaque nœud
+            // En maillage complet avec 3 nœuds, chaque nœud doit avoir 2 connexions
+            int connectionsJ1 = serveurJ1.getConnectedPeersList().size();
+            int connectionsJ2 = serveurJ2.getConnectedPeersList().size();
+            int connectionsJ3 = serveurJ3.getConnectedPeersList().size();
+
+            assertEquals(2, connectionsJ1, "J1 (hôte) doit avoir 2 connexions (J2 et J3)");
+            assertEquals(2, connectionsJ2, "J2 doit avoir 2 connexions (J1 et J3) - BUG si seulement 1");
+            assertEquals(2, connectionsJ3, "J3 doit avoir 2 connexions (J1 et J2) - BUG si seulement 1");
+
+        } finally {
+            serveurJ1.shutdown();
+            serveurJ2.shutdown();
+            serveurJ3.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("Test race condition - connexions rapides successives")
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void testRaceConditionRapidConnections() throws InterruptedException {
+        int portJ1 = testPort + 220;
+        int portJ2 = testPort + 221;
+        int portJ3 = testPort + 222;
+
+        Serveur serveurJ1 = new Serveur("J1", "localhost", portJ1);
+        Serveur serveurJ2 = new Serveur("J2", "localhost", portJ2);
+        Serveur serveurJ3 = new Serveur("J3", "localhost", portJ3);
+
+        try {
+            serveurJ1.start();
+            serveurJ2.start();
+            serveurJ3.start();
+            Thread.sleep(100);
+
+            // Connexions quasi-simultanées (simule le bug observé)
+            serveurJ2.connectToNode("J1", "localhost", portJ1);
+            serveurJ3.connectToNode("J1", "localhost", portJ1);
+
+            // Attendre un peu plus pour la propagation
+            Thread.sleep(1500);
+
+            // Envoyer des positions depuis tous les joueurs
+            for (int i = 0; i < 5; i++) {
+                serveurJ1.movePlayer(100 + i, 100 + i);
+                serveurJ2.movePlayer(200 + i, 200 + i);
+                serveurJ3.movePlayer(300 + i, 300 + i);
+                Thread.sleep(100);
+            }
+
+            Thread.sleep(500);
+
+            // Vérifier que tout le monde voit tout le monde
+            Map<String, int[]> posJ1 = serveurJ1.getPlayerPositions();
+            Map<String, int[]> posJ2 = serveurJ2.getPlayerPositions();
+            Map<String, int[]> posJ3 = serveurJ3.getPlayerPositions();
+
+            // J1 doit voir 3 joueurs
+            assertEquals(3, posJ1.size(), "J1 doit voir 3 joueurs (lui-même, J2, J3)");
+
+            // J2 doit voir 3 joueurs (c'est ici que le bug se manifeste)
+            assertEquals(3, posJ2.size(),
+                "J2 doit voir 3 joueurs - BUG CONFIRMÉ si seulement " + posJ2.size() +
+                " joueurs visibles: " + posJ2.keySet());
+
+            // J3 doit voir 3 joueurs
+            assertEquals(3, posJ3.size(),
+                "J3 doit voir 3 joueurs - BUG CONFIRMÉ si seulement " + posJ3.size() +
+                " joueurs visibles: " + posJ3.keySet());
+
+        } finally {
+            serveurJ1.shutdown();
+            serveurJ2.shutdown();
+            serveurJ3.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("Test PEER_LIST est bien envoyé aux nouveaux connectés")
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void testPeerListSentToNewPeers() throws InterruptedException {
+        int portJ1 = testPort + 230;
+        int portJ2 = testPort + 231;
+        int portJ3 = testPort + 232;
+
+        Serveur serveurJ1 = new Serveur("J1", "localhost", portJ1);
+        Serveur serveurJ2 = new Serveur("J2", "localhost", portJ2);
+        Serveur serveurJ3 = new Serveur("J3", "localhost", portJ3);
+
+        try {
+            serveurJ1.start();
+            Thread.sleep(100);
+
+            // J2 se connecte d'abord
+            serveurJ2.start();
+            serveurJ2.connectToNode("J1", "localhost", portJ1);
+            Thread.sleep(500); // J2 est maintenant dans la PEER_LIST de J1
+
+            // J3 se connecte après - il devrait recevoir J2 dans la PEER_LIST
+            serveurJ3.start();
+            serveurJ3.connectToNode("J1", "localhost", portJ1);
+            Thread.sleep(1000); // Attendre la propagation
+
+            // Envoyer des positions
+            serveurJ1.movePlayer(100, 100);
+            serveurJ2.movePlayer(200, 200);
+            serveurJ3.movePlayer(300, 300);
+            Thread.sleep(500);
+
+            // J3 doit avoir reçu la PEER_LIST contenant J2 et s'y être connecté
+            Map<String, int[]> posJ3 = serveurJ3.getPlayerPositions();
+            assertTrue(posJ3.containsKey("J2"),
+                "J3 doit voir J2 grâce à la PEER_LIST reçue de J1. " +
+                "Joueurs visibles par J3: " + posJ3.keySet());
+
+        } finally {
+            serveurJ1.shutdown();
+            serveurJ2.shutdown();
+            serveurJ3.shutdown();
+        }
     }
 }
 
