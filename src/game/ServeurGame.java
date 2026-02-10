@@ -6,7 +6,7 @@ import Reseau.Serveur;
 /**
  * Classe représentant le serveur de jeu multijoueur.
  * Étend la classe Serveur pour gérer les communications réseau spécifiques au jeu.
- * Gère les messages de position des joueurs en P2P maillé complet.
+ * Gère les messages de position des joueurs.
  */
 public class ServeurGame extends Serveur {
     /** Adaptateur réseau pour communiquer avec le jeu */
@@ -71,8 +71,8 @@ public class ServeurGame extends Serveur {
     /**
      * Traite un message de déplacement de joueur.
      * Extrait les informations de position et met à jour l'état du jeu.
-     * En P2P maillé complet, pas de relais nécessaire car chaque joueur
-     * envoie directement sa position à tous les pairs.
+     * MODIFIÉ : Ajoute un relais pour assurer que tous les joueurs reçoivent l'info
+     * même si la connexion directe P2P échoue.
      *
      * @param message Message de déplacement au format "MOVE:playerId:positionData"
      * @param sender  Connexion du pair émetteur
@@ -97,10 +97,20 @@ public class ServeurGame extends Serveur {
             // Mettre à jour la position localement
             adapter.onPositionReceived(playerId, positionData);
 
-            // Pas de relais en P2P maillé complet
+            // --- FIX P2P VISIBILITY ---
+            // Relayer le message aux autres pairs connectés.
+            // Cela permet de contourner les problèmes de NAT/Pare-feu qui bloquent
+            // les connexions directes entre clients. Le serveur agit comme un pont.
+            for (GestionConnection peer : connectedPeers) {
+                // Ne pas renvoyer à l'expéditeur
+                if (peer != sender) {
+                    peer.sendMessage(message);
+                }
+            }
+            // --------------------------
+
         } catch (Exception e) {
             // Ignorer les erreurs de parsing
         }
     }
 }
-
