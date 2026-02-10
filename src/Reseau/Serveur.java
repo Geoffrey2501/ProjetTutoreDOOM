@@ -242,47 +242,28 @@ public class Serveur {
      * Traiter un message de type HELLO:peerId@host:port
      * Identifie un nouveau pair et propage ses infos aux autres pairs.
      */
+    // Dans src/Reseau/Serveur.java
+
     private void processHelloMessage(String message, GestionConnection sender) {
         try {
-            // Format: "HELLO:J2@localhost:5002"
-            String content = message.substring(6); // Enlever "HELLO:"
+            String content = message.substring(6);
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
-
-            // Vérifier s'il existe déjà une connexion avec ce pair (doublon)
-            for (GestionConnection existingPeer : connectedPeers) {
-                if (existingPeer != sender &&
-                    peerInfo.getPeerId().equals(existingPeer.getRemotePeerId())) {
-                    // Connexion dupliquée détectée !
-                    // Stratégie : on garde la connexion initiée par le pair avec l'ID le plus petit
-                    // Cela garantit qu'une seule connexion subsiste entre deux pairs
-                    if (nodeId.compareTo(peerInfo.getPeerId()) < 0) {
-                        // Notre ID est plus petit : on garde notre connexion sortante
-                        // et on rejette cette connexion entrante
-                        sender.disconnect();
-                        return;
-                    } else {
-                        // L'ID du pair est plus petit : on garde sa connexion entrante
-                        // et on ferme notre connexion sortante
-                        existingPeer.disconnect();
-                        break;
-                    }
-                }
-            }
-
-            // Mettre à jour le remotePeerId du sender
+            
             sender.setRemotePeerId(peerInfo.getPeerId());
 
-            // Ajouter/Mettre à jour ce pair dans la liste des pairs connus (avec le bon port d'écoute)
+            // 1. On l'ajoute officiellement à nos connaissances
             knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
-            // Envoyer la liste des pairs connus au nouveau pair
+            // 2. On lui envoie TOUTE notre liste actuelle (Maillage complet)
             sendPeerListTo(sender);
 
-            // Annoncer ce nouveau pair à tous les autres pairs connectés
+            // 3. On annonce son arrivée à tout le réseau existant
             broadcastNewPeer(peerInfo);
+
+            System.out.println("[" + nodeId + "] " + peerInfo.getPeerId() + " est maintenant intégré au maillage.");
         } catch (Exception e) {
-            // Ignorer les erreurs de parsing
+            // Log error
         }
     }
 
@@ -315,8 +296,11 @@ public class Serveur {
      */
     private void processPeerListMessage(String message) {
         try {
+            System.out.println("[" + nodeId + "] Reçu PEER_LIST: " + message);
             // Format: "PEER_LIST:J1@localhost:5001;J2@localhost:5002"
-            String content = message.substring(10); // Enlever "PEER_LIST:"
+            String content = message.substring(10);
+
+            // Enlever "PEER_LIST:"
             if (content.isEmpty()) return;
 
             String[] peerStrings = content.split(";");
@@ -340,22 +324,26 @@ public class Serveur {
     /**
      * Traiter un message de type NEW_PEER:peerX@host:port
      */
+
     private void processNewPeerMessage(String message) {
         try {
-            // Format: "NEW_PEER:J3@localhost:5003"
-            String content = message.substring(9); // Enlever "NEW_PEER:"
+            String content = message.substring(9);
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
 
-            // Ne pas se connecter à soi-même
             if (peerInfo.getPeerId().equals(nodeId)) return;
 
-            // Ne pas se connecter si déjà connu
-            if (knownPeers.containsKey(peerInfo.getPeerId())) return;
+            // Si on ne connaissait pas ce pair, on se connecte ET on le présente à nos autres amis
+            if (!knownPeers.containsKey(peerInfo.getPeerId())) {
+                System.out.println("[" + nodeId + "] Découverte d'un nouveau pair via relais : " + peerInfo.getPeerId());
+                connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
 
-            // Se connecter au nouveau pair (connectToNode gère l'ajout à knownPeers)
-            connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
+                // RELAIS : On informe nos autres pairs connectés de l'existence de ce nouveau
+                // Cela garantit que l'information circule partout dans le maillage
+                broadcastToPeers(message);
+            }
         } catch (Exception e) {
+            // Log error
         }
     }
 
@@ -409,6 +397,7 @@ public class Serveur {
         }
     }
 
+
     /**
      * Annoncer un nouveau pair à tous les pairs connectés
      *
@@ -416,6 +405,7 @@ public class Serveur {
      */
     private void broadcastNewPeer(PeerInfo peerInfo) {
         String message = "NEW_PEER:" + peerInfo.toString();
+        System.out.println("[" + nodeId + "] PEER_LIST: " + message);
         broadcastToPeers(message);
     }
 
