@@ -6,9 +6,12 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Nœud Peer-to-Peer (P2P) pour le système multijoueur Doom-like
+ * Nœud Peer-to-Peer (P2P) pour le système multijoueur Doom-like avec maillage complet
+ * Chaque nœud agit à la fois comme client et serveur.
+ * * MODIFICATION : Activation du relais de messages pour pallier les échecs de connexion P2P directe.
+ *
  * @author Groupe DOOM
- * @version 1.2 (Correction IP + Relais)
+ * @version 1.1 (Avec Relais)
  */
 public class Serveur {
 
@@ -23,20 +26,36 @@ public class Serveur {
     private int posX = 0;
     private int posY = 0;
 
+    /**
+     * Constructeur du nœud P2P
+     *
+     * @param nodeId Identifiant unique du nœud (ex: "J1", "J2")
+     * @param host   Adresse IP du nœud (ex: "localhost", "192.168.1.10")
+     * @param port   Port d'écoute du serveur (ex: 5001)
+     */
     public Serveur(String nodeId, String host, int port) {
         this.nodeId = nodeId;
         this.host = host;
         this.port = port;
     }
 
+    /**
+     * Obtenir l'identifiant du nœud
+     */
     public String getNodeId() {
         return nodeId;
     }
 
+    /**
+     * Obtenir la liste des pairs connectés (pour les sous-classes)
+     */
     protected List<GestionConnection> getConnectedPeersList() {
         return connectedPeers;
     }
 
+    /**
+     * Démarrer le nœud P2P
+     */
     public void start() {
         try {
             serverSocket = new ServerSocket(port);
@@ -85,7 +104,7 @@ public class Serveur {
 
                 String helloMsg = "HELLO:" + nodeId + "@" + getLocalIPAddress() + ":" + port;
                 peerConnection.sendMessage(helloMsg);
-                // On enverra la PEER_LIST après avoir reçu le HELLO du client pour être sûr de l'avoir identifié
+                sendPeerListTo(peerConnection);
             }
         } catch (IOException e) {
         }
@@ -157,30 +176,15 @@ public class Serveur {
 
     private void processHelloMessage(String message, GestionConnection sender) {
         try {
-            // Format reçu: "HELLO:Nom@IP_Declaree:Port"
             String content = message.substring(6);
-            PeerInfo declaredInfo = PeerInfo.fromString(content.trim());
-            if (declaredInfo == null) return;
+            PeerInfo peerInfo = PeerInfo.fromString(content.trim());
+            if (peerInfo == null) return;
 
-            // 1. Récupération de l'IP réelle via la socket (celle qui marche vraiment)
-            String realIP = sender.getRemoteIPAddress();
-
-            // 2. Création d'une info corrigée : On garde l'ID et le Port déclarés, mais on force l'IP réelle
-            // (Sauf si c'est du localhost pour des tests locaux)
-            PeerInfo correctInfo;
-            if (realIP != null && !realIP.equals("127.0.0.1") && !realIP.equals("0:0:0:0:0:0:0:1") && !realIP.equals(declaredInfo.getHost())) {
-                System.out.println("[" + nodeId + "] ⚠️ Correction IP pour " + declaredInfo.getPeerId() +
-                        ": " + declaredInfo.getHost() + " -> " + realIP);
-                correctInfo = new PeerInfo(declaredInfo.getPeerId(), realIP, declaredInfo.getPort());
-            } else {
-                correctInfo = declaredInfo;
-            }
-
-            // Gestion des doublons (inchangée)
+            // Gestion des doublons
             for (GestionConnection existingPeer : connectedPeers) {
                 if (existingPeer != sender &&
-                        correctInfo.getPeerId().equals(existingPeer.getRemotePeerId())) {
-                    if (nodeId.compareTo(correctInfo.getPeerId()) < 0) {
+                        peerInfo.getPeerId().equals(existingPeer.getRemotePeerId())) {
+                    if (nodeId.compareTo(peerInfo.getPeerId()) < 0) {
                         sender.disconnect();
                         return;
                     } else {
@@ -190,23 +194,20 @@ public class Serveur {
                 }
             }
 
-            sender.setRemotePeerId(correctInfo.getPeerId());
-            System.out.println("[" + nodeId + "] ✓ " + correctInfo.getPeerId() + " identifié et connecté.");
-
-            // On stocke la BONNE info dans knownPeers
-            knownPeers.put(correctInfo.getPeerId(), correctInfo);
-
-            // On envoie la liste des pairs au nouveau venu
+            sender.setRemotePeerId(peerInfo.getPeerId());
+            System.out.println("[" + nodeId + "] ✓ " + peerInfo.getPeerId() + " identifié");
+            knownPeers.put(peerInfo.getPeerId(), peerInfo);
             sendPeerListTo(sender);
-
-            // IMPORTANT: On diffuse la BONNE info (IP corrigée) à tout le monde
-            broadcastNewPeer(correctInfo);
-
+            broadcastNewPeer(peerInfo);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Traiter un message de type MOVE:playerId:x,y
+     * MODIFIÉ : Ajout du relais vers les autres pairs
+     */
     private void processMoveMessage(String message, GestionConnection sender) {
         try {
             String content = message.substring(5);
@@ -222,13 +223,19 @@ public class Serveur {
 
             playerPositions.put(playerId, new int[]{x, y});
 
-            // Relais (conserve le maillage si connexion directe impossible)
+            // --- AJOUT RELAIS ---
+            // Si la connexion directe a échoué, ce relais permet aux autres pairs
+            // de recevoir la position via ce nœud (serveur/pivot).
             for (GestionConnection peer : connectedPeers) {
+                // On transmet à tous sauf à l'expéditeur d'origine
                 if (peer != sender) {
                     peer.sendMessage(message);
                 }
             }
+            // --------------------
+
         } catch (NumberFormatException e) {
+            // Ignorer
         }
     }
 
@@ -249,7 +256,6 @@ public class Serveur {
         try {
             String content = message.substring(9);
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
-            // Si on reçoit une info de pair, on tente de s'y connecter
             if (peerInfo == null || peerInfo.getPeerId().equals(nodeId) || knownPeers.containsKey(peerInfo.getPeerId())) return;
             connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
         } catch (Exception e) {}
