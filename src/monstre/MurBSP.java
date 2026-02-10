@@ -8,10 +8,12 @@ public class MurBSP extends Mur {
 
     @Override
     public boolean esDansMur(int x, int y) {
-        double coeficientA = (y2 - y1) / (x2 - x1);
-        double coeficientB = (y - y1) / (x - x1);
+        // Utilisation du produit en croix pour éviter la division par zéro
+        // coeficientA == coeficientB équivaut à (y2-y1)*(x-x1) == (y-y1)*(x2-x1)
+        long produitCroiseA = (long)(y2 - y1) * (x - x1);
+        long produitCroiseB = (long)(y - y1) * (x2 - x1);
 
-        if (coeficientA == coeficientB
+        if (produitCroiseA == produitCroiseB
                 && x >= Math.min(x1, x2)
                 && x <= Math.max(x1, x2)
                 && y >= Math.min(y1, y2)
