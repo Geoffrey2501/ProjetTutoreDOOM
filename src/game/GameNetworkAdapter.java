@@ -86,47 +86,32 @@ public class GameNetworkAdapter {
      * @param positionData données de position reçues
      */
     void onPositionReceived(String playerId, String positionData) {
-        if (localPlayer != null && playerId.equals(localPlayer.getId())) {
-            return;
-        }
+        if (localPlayer != null && playerId.equals(localPlayer.getId())) return;
 
         boolean isNewPlayer = false;
         Joueur remotePlayer;
 
-        // Synchroniser pour éviter la création de doublons
         synchronized (remotePlayers) {
             remotePlayer = remotePlayers.get(playerId);
-
             if (remotePlayer == null) {
-                // Créer le joueur sans position (non initialisé)
                 remotePlayer = new Joueur(playerId);
-                // Parser les coordonnées
-                if (!remotePlayer.fromNetworkString(positionData)) {
-                    // Si le parsing échoue, ne pas ajouter ce joueur
-                    return;
-                }
-                remotePlayers.put(playerId, remotePlayer);
+                // On tente de parser la position
+                if (!remotePlayer.fromNetworkString(positionData)) return;
 
-                // Vérifier si on a déjà notifié ce joueur
-                if (notifiedPlayers.add(playerId)) {
-                    isNewPlayer = true;
-                }
+                remotePlayers.put(playerId, remotePlayer);
+                isNewPlayer = true;
             } else {
                 remotePlayer.fromNetworkString(positionData);
             }
         }
 
-        // Ne notifier que si la position est valide
         if (listener != null && remotePlayer.isPositionInitialized()) {
+            // Si c'est un nouveau joueur, on DOIT appeler onPlayerJoin
             if (isNewPlayer) {
                 listener.onPlayerJoin(playerId);
             }
-            listener.onPlayerPositionUpdate(
-                playerId,
-                remotePlayer.getX(),
-                remotePlayer.getY(),
-                remotePlayer.getAngle()
-            );
+            // Puis on met à jour sa position pour le rendu
+            listener.onPlayerPositionUpdate(playerId, remotePlayer.getX(), remotePlayer.getY(), remotePlayer.getAngle());
         }
     }
 

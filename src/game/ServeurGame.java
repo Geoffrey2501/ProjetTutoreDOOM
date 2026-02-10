@@ -81,23 +81,21 @@ public class ServeurGame extends Serveur {
         try {
             String content = message.substring(5);
             int colonIndex = content.indexOf(':');
-            if (colonIndex == -1) {
-                return;
-            }
+            if (colonIndex == -1) return;
 
             String playerId = content.substring(0, colonIndex);
             String positionData = content.substring(colonIndex + 1);
 
-            // Identifier le pair si pas encore fait
+            // Si c'est la première fois qu'on entend parler de ce joueur
             if (sender.getRemotePeerId() == null) {
                 sender.setRemotePeerId(playerId);
+                // TRÈS IMPORTANT : On lui renvoie NOTRE position immédiatement
+                // pour qu'il nous voit aussi dès son arrivée
                 adapter.sendPlayerPositionTo(sender);
             }
 
-            // Mettre à jour la position localement
+            // Mettre à jour la position dans l'adaptateur
             adapter.onPositionReceived(playerId, positionData);
-
-            // Pas de relais en P2P maillé complet
         } catch (Exception e) {
             // Ignorer les erreurs de parsing
         }

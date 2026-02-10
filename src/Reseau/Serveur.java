@@ -249,7 +249,7 @@ public class Serveur {
             String content = message.substring(6);
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
-            
+
             sender.setRemotePeerId(peerInfo.getPeerId());
 
             // 1. On l'ajoute officiellement à nos connaissances
