@@ -63,9 +63,20 @@ public class ServeurGame extends Serveur {
 
         if (message.startsWith("MOVE:")) {
             processGameMoveMessage(message, sender);
+        } else if (message.startsWith("JOIN:")) {
+            processJoinMessage(message);
         } else {
             super.processMessageFromPeer(message, sender);
         }
+    }
+
+    /**
+     * Traite un message JOIN d'un joueur.
+     * @param message Message au format "JOIN:playerId"
+     */
+    private void processJoinMessage(String message) {
+        String playerId = message.substring(5); // Enlever "JOIN:"
+        adapter.onPlayerJoinReceived(playerId);
     }
 
     /**
