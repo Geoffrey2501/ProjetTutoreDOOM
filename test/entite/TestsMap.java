@@ -25,10 +25,10 @@ public class TestsMap {
     @Test
     void testMapChargementValide() {
         String content =
-            "11111\n" +
-            "10001\n" +
-            "10101\n" +
-            "11111";
+                "11111\n" +
+                        "10001\n" +
+                        "10101\n" +
+                        "11111";
         createTempFile(TEST_FILE, content);
 
         MapBool map = new MapBool(TEST_FILE);
@@ -45,9 +45,9 @@ public class TestsMap {
     @Test
     void testIsWall() {
         String content =
-            "111\n" +
-            "101\n" +
-            "111";
+                "111\n" +
+                        "101\n" +
+                        "111";
         createTempFile(TEST_FILE, content);
 
         MapBool map = new MapBool(TEST_FILE);
@@ -67,9 +67,9 @@ public class TestsMap {
     void testMapInvalide() {
         // Création d'une map non rectangulaire
         String content =
-            "111\n" +
-            "10\n" +
-            "111";
+                "111\n" +
+                        "10\n" +
+                        "111";
         createTempFile(TEST_FILE, content);
 
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
@@ -79,8 +79,8 @@ public class TestsMap {
         // On vérifie que le message d'erreur contient bien ce qu'on attend
         // Note: Le message exact dépend de l'implémentation dans Map.java
         assertTrue(exception.getMessage().contains("Map non rectangulaire") ||
-                   exception.getMessage().contains("Largeur invalide"),
-                   "Le message d'erreur devrait indiquer le problème de dimensions");
+                        exception.getMessage().contains("Largeur invalide"),
+                "Le message d'erreur devrait indiquer le problème de dimensions");
     }
 
     private void createTempFile(String filename, String content) {

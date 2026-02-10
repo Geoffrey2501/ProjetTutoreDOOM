@@ -4,352 +4,174 @@ import moteur_graphique.Window;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
 import entite.Joueur;
-import entite.Sprite;
 
-import javax.swing.*;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-public class MainGameMultiplayer implements Runnable, NetworkListener {
+/**
+ * Classe principale du jeu multijoueur.
+ * Coordonne les différents composants : rendu, réseau, entrées, joueur.
+ * Implémente le pattern Façade pour simplifier l'utilisation du jeu.
+ */
+public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     private static final Logger LOGGER = Logger.getLogger(MainGameMultiplayer.class.getName());
 
+    // === Composants du jeu ===
     private final MapBool map;
     private final Joueur joueur;
-
-    //séparation : Window pour l'UI/Fenêtre, GameRenderer pour le calcul/rendu
     private final Window window;
     private final Raycasting raycasting;
-
     private final Input input;
-    private Robot robot;
 
+    // === Contrôleurs ===
+    private final PlayerController playerController;
+    private final MouseGestion mouseCaptureHandler;
+    private final PlayerSpriteManager spriteManager;
+    private final GameLoop gameLoop;
+
+    // === Réseau ===
     private final GameNetworkAdapter network;
-    private final java.util.Map<String, Sprite> playerSprites;
 
-    private boolean running;
-    public static final int FPS = 60;
-    public static final long OPTIMAL_TIME = 1_000_000_000 / FPS;
-
-    private static final String PLAYER_SPRITE_PATH = "assets/sprites/jonesy.png";
-
-    private boolean mouseCaptured = true;
-    private boolean escapePressed = false;
-    private final Cursor blankCursor;
-    private final Cursor defaultCursor;
-
-    private final Point centerPoint;
-
+    /**
+     * Constructeur du jeu multijoueur.
+     * @param playerId identifiant du joueur local
+     * @param port port d'écoute pour les connexions entrantes
+     * @param serverIp IP du serveur/pair à rejoindre (peut être null)
+     * @param serverPort port du serveur/pair à rejoindre
+     */
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
-        map = new MapBool("assets/maps/map.txt");
-        joueur = new Joueur(playerId, 2.0, 2.0, 0.0);
+        // 1. Initialisation de la carte et du joueur
+        map = new MapBool(GameConfig.MAP_PATH);
+        joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
-        playerSprites = new ConcurrentHashMap<>();
-        centerPoint = new Point();
 
-        // 1. Initialisation du moteur de rendu (logique pure)
+        // 2. Initialisation du moteur de rendu
         raycasting = new Raycasting(map, joueur);
 
-        // 2. Initialisation de la fenêtre (UI)
-        // On définit une taille par défaut, par exemple 1280x720 ou 1920x1080
-        window = new Window(1920, 1080);
-
-        //GameRenderer r = new TopDownRenderer(map, joueur);
-        //window.setRenderer(r);
-
-        // 3. On lie le moteur à la fenêtre
+        // 3. Initialisation de la fenêtre
+        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT);
         window.setRenderer(raycasting);
-
-        // 4. Gestion des Inputs sur la fenêtre
         window.addInputListener(input);
 
-        try {
-            robot = new Robot();
-        } catch (AWTException e) {
-            LOGGER.log(java.util.logging.Level.SEVERE, "Erreur lors de la création du Robot", e);
-        }
+        // 4. Initialisation des contrôleurs
+        playerController = new PlayerController(joueur, map, input);
+        mouseCaptureHandler = new MouseGestion(window, input);
 
-        BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-        blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
-                cursorImg, new Point(0, 0), "blank cursor");
-        defaultCursor = Cursor.getDefaultCursor();
-
-        // Application du curseur sur la fenêtre
-        window.setCursor(blankCursor);
-
+        // 5. Initialisation du réseau
         network = new GameNetworkAdapter(playerId, "localhost", port);
         network.setLocalPlayer(joueur);
         network.setNetworkListener(this);
         network.start();
 
+        // 6. Initialisation du gestionnaire de sprites
+        spriteManager = new PlayerSpriteManager(raycasting, network);
+
+        // 7. Initialisation de la boucle de jeu
+        gameLoop = new GameLoop(this);
+
+        // 8. Connexion au serveur/pair si spécifié
         if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
             network.connectToPlayer("Server", serverIp, serverPort);
         }
 
-        // Log via la fenêtre
+        // Log de connexion
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
 
-    @Override
-    public void run() {
-        running = true;
-        long lastLoopTime = System.nanoTime();
-
-        while (running) {
-            long now = System.nanoTime();
-            long updateLength = now - lastLoopTime;
-            lastLoopTime = now;
-            double delta = updateLength / 1_000_000_000.0;
-
-            update(delta);
-
-            // Rendu via la fenêtre
-            window.draw();
-
-            try {
-                Thread.sleep(Math.max(0, (lastLoopTime - System.nanoTime() + OPTIMAL_TIME) / 1_000_000));
-            } catch (InterruptedException e) {
-                LOGGER.log(java.util.logging.Level.WARNING, "Thread interrompu", e);
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        network.shutdown();
+    /**
+     * Démarre le jeu dans un nouveau thread.
+     */
+    public void start() {
+        new Thread(gameLoop).start();
     }
 
-    private void update(double delta) {
-        handleMouseCaptureState();
+    @Override
+    public void update(double delta) {
+        // Mise à jour de la capture de la souris
+        mouseCaptureHandler.update();
 
-        double moveSpeed = 1.5 * delta;
-        double rotSpeed = 2.0 * delta;
+        // Mise à jour des mouvements du joueur
+        boolean moved = playerController.update(delta);
 
-        boolean moved = handleMovement(moveSpeed);
-        moved |= handleKeyboardRotation(rotSpeed);
-        moved |= handleMouseRotation();
+        // Gestion de la rotation à la souris
+        int deltaX = mouseCaptureHandler.handleMouseRotation();
+        if (deltaX != 0) {
+            playerController.applyMouseRotation(deltaX);
+            moved = true;
+        }
 
+        // Envoi de la position si le joueur a bougé
         if (moved) {
             network.sendPlayerPosition();
         }
 
-        // Gestion du scoreboard via Window
+        // Gestion du scoreboard
+        updateScoreboard();
+
+        // Mise à jour des sprites des joueurs distants
+        spriteManager.update(delta);
+    }
+
+    @Override
+    public void render() {
+        window.draw();
+    }
+
+    @Override
+    public void onShutdown() {
+        network.shutdown();
+    }
+
+    /**
+     * Met à jour l'affichage du scoreboard.
+     */
+    private void updateScoreboard() {
         window.setShowScoreboard(input.isShowScoreboard());
         if (input.isShowScoreboard()) {
             List<String> remotePlayerNames = new ArrayList<>(network.getRemotePlayers().keySet());
             window.updatePlayerList(joueur.getId(), remotePlayerNames);
         }
-
-        updateRemotePlayerSprites(delta);
     }
 
-    private boolean handleMovement(double moveSpeed) {
-        double angle = joueur.getAngle();
-        double cos = Math.cos(angle);
-        double sin = Math.sin(angle);
-
-        double dx = 0;
-        double dy = 0;
-        boolean moved = false;
-
-        if (input.isForward()) {
-            dx += cos;
-            dy += sin;
-        }
-        if (input.isBackward()) {
-            dx -= cos;
-            dy -= sin;
-        }
-        if (input.isStrafeLeft()) {
-            dx += sin;
-            dy -= cos;
-        }
-        if (input.isStrafeRight()) {
-            dx -= sin;
-            dy += cos;
-        }
-
-        if (dx != 0 || dy != 0) {
-            dx *= moveSpeed;
-            dy *= moveSpeed;
-            moved = applyMovement(dx, dy);
-        }
-
-        return moved;
-    }
-
-    private boolean applyMovement(double dx, double dy) {
-        boolean moved = false;
-        double nextX = joueur.getX() + dx;
-        double nextY = joueur.getY() + dy;
-
-        if (!map.isWall((int) nextX, (int) joueur.getY())) {
-            joueur.setX(nextX);
-            moved = true;
-        }
-
-        if (!map.isWall((int) joueur.getX(), (int) nextY)) {
-            joueur.setY(nextY);
-            moved = true;
-        }
-
-        return moved;
-    }
-
-    private boolean handleKeyboardRotation(double rotSpeed) {
-        double angle = joueur.getAngle();
-        if (input.isTurnLeft()) {
-            joueur.setAngle(angle - rotSpeed);
-            return true;
-        } else if (input.isTurnRight()) {
-            joueur.setAngle(angle + rotSpeed);
-            return true;
-        }
-        return false;
-    }
-
-    private boolean handleMouseRotation() {
-        // On vérifie si la fenêtre est visible et active
-        if (!mouseCaptured || !window.isVisible()) {
-            return false;
-        }
-
-        // On utilise les dimensions de la Window
-        int width = window.getWidth();
-        int height = window.getHeight();
-        int centerX = width / 2;
-        int centerY = height / 2;
-
-        int deltaX = input.getMouseX() - centerX;
-
-        if (deltaX != 0) {
-            joueur.setAngle(joueur.getAngle() + deltaX * 0.001);
-
-            centerPoint.setLocation(centerX, centerY);
-            // Conversion relative à la fenêtre
-            SwingUtilities.convertPointToScreen(centerPoint, window);
-            robot.mouseMove(centerPoint.x, centerPoint.y);
-
-            input.setMouseX(centerX);
-            input.setMouseY(centerY);
-            return true;
-        }
-
-        return false;
-    }
-
-    private void handleMouseCaptureState() {
-        if (input.isEscape()) {
-            if (!escapePressed) {
-                escapePressed = true;
-                toggleMouseCapture(!mouseCaptured);
-            }
-        } else {
-            escapePressed = false;
-        }
-
-        if (!mouseCaptured && input.isMouseLeftClicked()) {
-            toggleMouseCapture(true);
-            input.resetMouseLeftClicked();
-        }
-    }
-
-    private void toggleMouseCapture(boolean capture) {
-        mouseCaptured = capture;
-        if (mouseCaptured) {
-            window.setCursor(blankCursor);
-            recenterMouse();
-        } else {
-            window.setCursor(defaultCursor);
-        }
-    }
-
-    private void recenterMouse() {
-        if (window.isVisible()) {
-            centerPoint.setLocation(window.getWidth() / 2, window.getHeight() / 2);
-            SwingUtilities.convertPointToScreen(centerPoint, window);
-            robot.mouseMove(centerPoint.x, centerPoint.y);
-            input.setMouseX(window.getWidth() / 2);
-            input.setMouseY(window.getHeight() / 2);
-        }
-    }
-
-    private void updateRemotePlayerSprites(double delta) {
-        for (java.util.Map.Entry<String, Joueur> entry : network.getRemotePlayers().entrySet()) {
-            String playerId = entry.getKey();
-            Joueur remotePlayer = entry.getValue();
-
-            remotePlayer.interpolate(delta);
-
-            Sprite sprite = playerSprites.get(playerId);
-            if (sprite != null) {
-                sprite.setX(remotePlayer.getX());
-                sprite.setY(remotePlayer.getY());
-            }
-        }
-    }
+    // === Implémentation de NetworkListener ===
 
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
-        synchronized (playerSprites) {
-            if (!playerSprites.containsKey(playerId)) {
-                Joueur remotePlayer = network.getRemotePlayer(playerId);
-                if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
-                    Sprite playerSprite = new Sprite(x, y, PLAYER_SPRITE_PATH, playerId);
-                    playerSprites.put(playerId, playerSprite);
-                    // Ajout du sprite au moteur de rendu (Raycasting)
-                    raycasting.addSprite(playerSprite);
-                }
-            }
-        }
+        spriteManager.onPlayerPositionUpdate(playerId, x, y);
     }
 
     @Override
     public void onPlayerJoin(String playerId) {
-        synchronized (playerSprites) {
-            if (playerSprites.containsKey(playerId)) {
-                return;
-            }
-
-            Joueur remotePlayer = network.getRemotePlayer(playerId);
-            if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
-                Sprite playerSprite = new Sprite(
-                        remotePlayer.getX(),
-                        remotePlayer.getY(),
-                        PLAYER_SPRITE_PATH,
-                        playerId
-                );
-                playerSprites.put(playerId, playerSprite);
-                raycasting.addSprite(playerSprite);
-            }
+        if (spriteManager.onPlayerJoin(playerId)) {
+            window.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         }
-
-        // Log sur la fenêtre
-        window.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         network.sendPlayerPositionNow();
     }
 
     @Override
     public void onPlayerLeave(String playerId) {
-        Sprite sprite;
-        synchronized (playerSprites) {
-            sprite = playerSprites.remove(playerId);
-        }
-        if (sprite != null) {
-            raycasting.removeSprite(sprite);
-            // Log sur la fenêtre
+        if (spriteManager.onPlayerLeave(playerId)) {
             window.addLogMessage(playerId + " a quitté la partie", Color.RED);
         }
     }
 
+    /**
+     * Arrête le jeu.
+     */
     public void stop() {
-        running = false;
+        gameLoop.stop();
     }
 
+
+    /**
+     * Récupère l'adresse IP locale de la machine.
+     * @return l'adresse IP locale ou "localhost" si non trouvée
+     */
     private static String getLocalIPAddress() {
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -366,11 +188,14 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
                 }
             }
         } catch (Exception e) {
-            // Ignorer
+            // Ignorer les erreurs
         }
         return "localhost";
     }
 
+    /**
+     * Point d'entrée principal du jeu.
+     */
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
@@ -416,6 +241,6 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         System.out.println("Contrôles: ZQSD/Flèches pour bouger, Souris pour regarder");
         System.out.println("Tab: Scoreboard | Échap: Libérer/Capturer la souris\n");
 
-        new Thread(game).start();
+        game.start();
     }
 }
