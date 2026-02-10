@@ -141,28 +141,35 @@ public class Serveur {
      * @param remotePort   Port du nœud distant (ex: 5001)
      */
     public void connectToNode(String remoteNodeId, String host, int remotePort) {
+        System.out.println("[" + nodeId + "] Tentative de connexion à " + remoteNodeId + " @ " + host + ":" + remotePort);
+
         // Ne pas se connecter à soi-même
         if (remoteNodeId.equals(nodeId)) {
+            System.out.println("[" + nodeId + "] Annulé: c'est moi-même");
             return;
         }
 
         // Vérifier si on est déjà connecté à ce pair
         for (GestionConnection peer : connectedPeers) {
             if (remoteNodeId.equals(peer.getRemotePeerId())) {
+                System.out.println("[" + nodeId + "] Annulé: déjà connecté à " + remoteNodeId);
                 return;
             }
         }
 
         // Vérifier si ce pair est déjà connu (connexion en cours ou établie)
         if (knownPeers.containsKey(remoteNodeId)) {
+            System.out.println("[" + nodeId + "] Annulé: " + remoteNodeId + " déjà dans knownPeers");
             return;
         }
 
         // Marquer ce pair comme "en cours de connexion" pour éviter les doublons
         knownPeers.put(remoteNodeId, new PeerInfo(remoteNodeId, host, remotePort));
+        System.out.println("[" + nodeId + "] " + remoteNodeId + " ajouté à knownPeers");
 
         executor.execute(() -> {
             try {
+                System.out.println("[" + nodeId + "] Connexion TCP à " + remoteNodeId + "...");
                 Socket socket = new Socket(host, remotePort);
                 GestionConnection peerConnection = new GestionConnection(socket, this);
                 peerConnection.setRemotePeerId(remoteNodeId);
@@ -171,8 +178,11 @@ public class Serveur {
                 executor.execute(peerConnection);
 
                 // Envoyer un message HELLO avec notre ID et port d'écoute
-                peerConnection.sendMessage("HELLO:" + nodeId + "@" + getLocalIPAddress() + ":" + port);
+                String helloMsg = "HELLO:" + nodeId + "@" + getLocalIPAddress() + ":" + port;
+                System.out.println("[" + nodeId + "] Envoi HELLO à " + remoteNodeId + ": " + helloMsg);
+                peerConnection.sendMessage(helloMsg);
             } catch (IOException e) {
+                System.err.println("[" + nodeId + "] ❌ Échec connexion à " + remoteNodeId + ": " + e.getMessage());
                 // En cas d'échec, retirer de knownPeers pour permettre une nouvelle tentative
                 knownPeers.remove(remoteNodeId);
             }
@@ -249,21 +259,31 @@ public class Serveur {
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
 
+            System.out.println("[" + nodeId + "] HELLO reçu de " + peerInfo.getPeerId());
+            System.out.println("[" + nodeId + "] Connexions actuelles avant traitement:");
+            for (GestionConnection peer : connectedPeers) {
+                System.out.println("  - " + (peer.getRemotePeerId() != null ? peer.getRemotePeerId() : "non identifié") +
+                                   " (" + (peer == sender ? "SENDER" : "autre") + ")");
+            }
+
             // Vérifier s'il existe déjà une connexion avec ce pair (doublon)
             for (GestionConnection existingPeer : connectedPeers) {
                 if (existingPeer != sender &&
                     peerInfo.getPeerId().equals(existingPeer.getRemotePeerId())) {
                     // Connexion dupliquée détectée !
+                    System.out.println("[" + nodeId + "] ⚠️ DOUBLON détecté avec " + peerInfo.getPeerId());
                     // Stratégie : on garde la connexion initiée par le pair avec l'ID le plus petit
                     // Cela garantit qu'une seule connexion subsiste entre deux pairs
                     if (nodeId.compareTo(peerInfo.getPeerId()) < 0) {
                         // Notre ID est plus petit : on garde notre connexion sortante
                         // et on rejette cette connexion entrante
+                        System.out.println("[" + nodeId + "] → Fermeture de la connexion entrante de " + peerInfo.getPeerId());
                         sender.disconnect();
                         return;
                     } else {
                         // L'ID du pair est plus petit : on garde sa connexion entrante
                         // et on ferme notre connexion sortante
+                        System.out.println("[" + nodeId + "] → Fermeture de notre connexion sortante vers " + peerInfo.getPeerId());
                         existingPeer.disconnect();
                         break;
                     }
@@ -272,17 +292,27 @@ public class Serveur {
 
             // Mettre à jour le remotePeerId du sender
             sender.setRemotePeerId(peerInfo.getPeerId());
+            System.out.println("[" + nodeId + "] ✓ " + peerInfo.getPeerId() + " identifié");
 
             // Ajouter/Mettre à jour ce pair dans la liste des pairs connus (avec le bon port d'écoute)
             knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
             // Envoyer la liste des pairs connus au nouveau pair
+            System.out.println("[" + nodeId + "] Envoi PEER_LIST à " + peerInfo.getPeerId());
             sendPeerListTo(sender);
 
             // Annoncer ce nouveau pair à tous les autres pairs connectés
+            System.out.println("[" + nodeId + "] Broadcast NEW_PEER(" + peerInfo.getPeerId() + ") aux autres pairs");
             broadcastNewPeer(peerInfo);
+
+            System.out.println("[" + nodeId + "] Connexions après traitement:");
+            for (GestionConnection peer : connectedPeers) {
+                System.out.println("  - " + (peer.getRemotePeerId() != null ? peer.getRemotePeerId() : "non identifié"));
+            }
+            System.out.println();
         } catch (Exception e) {
-            // Ignorer les erreurs de parsing
+            System.err.println("[" + nodeId + "] Erreur dans processHelloMessage: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -317,7 +347,12 @@ public class Serveur {
         try {
             // Format: "PEER_LIST:J1@localhost:5001;J2@localhost:5002"
             String content = message.substring(10); // Enlever "PEER_LIST:"
-            if (content.isEmpty()) return;
+            if (content.isEmpty()) {
+                System.out.println("[" + nodeId + "] PEER_LIST vide reçu");
+                return;
+            }
+
+            System.out.println("[" + nodeId + "] PEER_LIST reçu: " + content);
 
             String[] peerStrings = content.split(";");
             for (String peerString : peerStrings) {
@@ -325,15 +360,23 @@ public class Serveur {
                 if (peerInfo == null) continue;
 
                 // Ne pas se connecter à soi-même
-                if (peerInfo.getPeerId().equals(nodeId)) continue;
+                if (peerInfo.getPeerId().equals(nodeId)) {
+                    System.out.println("[" + nodeId + "] Ignoré: c'est moi-même");
+                    continue;
+                }
 
                 // Ne pas se connecter si déjà connu
-                if (knownPeers.containsKey(peerInfo.getPeerId())) continue;
+                if (knownPeers.containsKey(peerInfo.getPeerId())) {
+                    System.out.println("[" + nodeId + "] Ignoré: " + peerInfo.getPeerId() + " déjà connu");
+                    continue;
+                }
 
                 // Se connecter au nouveau pair (connectToNode gère l'ajout à knownPeers)
+                System.out.println("[" + nodeId + "] → Connexion à " + peerInfo.getPeerId() + " @ " + peerInfo.getHost() + ":" + peerInfo.getPort());
                 connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
             }
         } catch (Exception e) {
+            System.err.println("[" + nodeId + "] Erreur dans processPeerListMessage: " + e.getMessage());
         }
     }
 
@@ -347,15 +390,25 @@ public class Serveur {
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
 
+            System.out.println("[" + nodeId + "] NEW_PEER reçu: " + peerInfo.getPeerId());
+
             // Ne pas se connecter à soi-même
-            if (peerInfo.getPeerId().equals(nodeId)) return;
+            if (peerInfo.getPeerId().equals(nodeId)) {
+                System.out.println("[" + nodeId + "] Ignoré: c'est moi-même");
+                return;
+            }
 
             // Ne pas se connecter si déjà connu
-            if (knownPeers.containsKey(peerInfo.getPeerId())) return;
+            if (knownPeers.containsKey(peerInfo.getPeerId())) {
+                System.out.println("[" + nodeId + "] Ignoré: " + peerInfo.getPeerId() + " déjà connu");
+                return;
+            }
 
             // Se connecter au nouveau pair (connectToNode gère l'ajout à knownPeers)
+            System.out.println("[" + nodeId + "] → Connexion à " + peerInfo.getPeerId() + " @ " + peerInfo.getHost() + ":" + peerInfo.getPort());
             connectToNode(peerInfo.getPeerId(), peerInfo.getHost(), peerInfo.getPort());
         } catch (Exception e) {
+            System.err.println("[" + nodeId + "] Erreur dans processNewPeerMessage: " + e.getMessage());
         }
     }
 
