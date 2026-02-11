@@ -120,9 +120,15 @@ public class GameNetworkAdapter {
      * @param playerId identifiant du joueur déconnecté
      */
     void onPlayerDisconnected(String playerId) {
+        System.out.println("[GameNetworkAdapter] onPlayerDisconnected appelé pour: " + playerId);
+
         Joueur removed = remotePlayers.remove(playerId);
         notifiedPlayers.remove(playerId); // Permettre une re-notification si le joueur revient
-        if (removed != null && listener != null) {
+
+        // Toujours notifier le listener pour supprimer le sprite, même si le joueur
+        // n'était pas dans remotePlayers (le sprite peut avoir été créé autrement)
+        if (listener != null) {
+            System.out.println("[GameNetworkAdapter] Notification de départ pour: " + playerId);
             listener.onPlayerLeave(playerId);
         }
     }

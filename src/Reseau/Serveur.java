@@ -482,6 +482,8 @@ public class Serveur {
     public void removePeer(GestionConnection peer) {
         connectedPeers.remove(peer);
         String peerId = peer.getRemotePeerId();
+        System.out.println("[" + nodeId + "] removePeer appelé, peerId=" + peerId);
+
         if (peerId != null) {
             // Retirer le pair des listes connues
             knownPeers.remove(peerId);
@@ -494,6 +496,8 @@ public class Serveur {
 
             // Callback pour les sous-classes
             onPeerDisconnected(peerId);
+        } else {
+            System.out.println("[" + nodeId + "] ATTENTION: peerId est null, déconnexion non propagée!");
         }
     }
 
