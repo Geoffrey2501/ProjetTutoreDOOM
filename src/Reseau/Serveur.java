@@ -252,27 +252,39 @@ public class Serveur {
             PeerInfo peerInfo = PeerInfo.fromString(content.trim());
             if (peerInfo == null) return;
 
-            sender.setRemotePeerId(peerInfo.getPeerId());
+            // Récupérer l'ancien ID (peut être "Server" ou autre ID temporaire)
+            String oldPeerId = sender.getRemotePeerId();
+            String newPeerId = peerInfo.getPeerId();
 
-            // Cela résout le problème de réseau où le client envoie son IP locale
+            // Mettre à jour avec le vrai nom
+            sender.setRemotePeerId(newPeerId);
+
+            // Nettoyer l'ancien ID temporaire si différent
+            if (oldPeerId != null && !oldPeerId.equals(newPeerId)) {
+                System.out.println("[" + nodeId + "] Mise à jour ID: " + oldPeerId + " -> " + newPeerId);
+                knownPeers.remove(oldPeerId);
+                playerPositions.remove(oldPeerId);
+            }
+
+            // Corriger l'IP si nécessaire
             String realIp = extractRealIpFromSocket(sender);
             if (realIp != null && !realIp.equals(peerInfo.getHost())) {
                 System.out.println("[" + nodeId + "] Correction IP pour " + peerInfo.getPeerId() +
                     ": " + peerInfo.getHost() + " -> " + realIp);
-                // Créer un nouveau PeerInfo avec l'IP réelle
                 peerInfo = new PeerInfo(peerInfo.getPeerId(), realIp, peerInfo.getPort());
             }
 
-            // 1. On l'ajoute officiellement à nos connaissances avec l'IP corrigée
+            // Ajouter aux pairs connus
             knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
-            // 2. On lui envoie TOUTE notre liste actuelle (Maillage complet)
-            sendPeerListTo(sender);
+            // Répondre avec notre HELLO (seulement si c'est un nouveau pair)
+            if (oldPeerId == null || !oldPeerId.equals(newPeerId)) {
+                sender.sendMessage("HELLO:" + nodeId + "@" + getLocalIPAddress() + ":" + port);
+                sendPeerListTo(sender);
+                broadcastNewPeer(peerInfo);
+            }
 
-            // 3. On annonce son arrivée à tout le réseau existant avec l'IP corrigée
-            broadcastNewPeer(peerInfo);
-
-            System.out.println("[" + nodeId + "] " + peerInfo.getPeerId() + " est maintenant intégré au maillage (IP: " + peerInfo.getHost() + ").");
+            System.out.println("[" + nodeId + "] " + peerInfo.getPeerId() + " intégré au maillage.");
         } catch (Exception e) {
             // Log error
         }
