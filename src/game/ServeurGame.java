@@ -89,7 +89,6 @@ public class ServeurGame extends Serveur {
             // Si c'est la première fois qu'on entend parler de ce joueur
             if (sender.getRemotePeerId() == null) {
                 sender.setRemotePeerId(playerId);
-                // TRÈS IMPORTANT : On lui renvoie NOTRE position immédiatement
                 // pour qu'il nous voit aussi dès son arrivée
                 adapter.sendPlayerPositionTo(sender);
             }

@@ -252,19 +252,53 @@ public class Serveur {
 
             sender.setRemotePeerId(peerInfo.getPeerId());
 
-            // 1. On l'ajoute officiellement à nos connaissances
+            // Cela résout le problème de réseau où le client envoie son IP locale
+            String realIp = extractRealIpFromSocket(sender);
+            if (realIp != null && !realIp.equals(peerInfo.getHost())) {
+                System.out.println("[" + nodeId + "] Correction IP pour " + peerInfo.getPeerId() +
+                    ": " + peerInfo.getHost() + " -> " + realIp);
+                // Créer un nouveau PeerInfo avec l'IP réelle
+                peerInfo = new PeerInfo(peerInfo.getPeerId(), realIp, peerInfo.getPort());
+            }
+
+            // 1. On l'ajoute officiellement à nos connaissances avec l'IP corrigée
             knownPeers.put(peerInfo.getPeerId(), peerInfo);
 
             // 2. On lui envoie TOUTE notre liste actuelle (Maillage complet)
             sendPeerListTo(sender);
 
-            // 3. On annonce son arrivée à tout le réseau existant
+            // 3. On annonce son arrivée à tout le réseau existant avec l'IP corrigée
             broadcastNewPeer(peerInfo);
 
-            System.out.println("[" + nodeId + "] " + peerInfo.getPeerId() + " est maintenant intégré au maillage.");
+            System.out.println("[" + nodeId + "] " + peerInfo.getPeerId() + " est maintenant intégré au maillage (IP: " + peerInfo.getHost() + ").");
         } catch (Exception e) {
             // Log error
         }
+    }
+
+    /**
+     * Extrait l'IP réelle du pair depuis le socket de connexion.
+     * Cela donne l'IP vue par le serveur, pas l'IP déclarée par le client.
+     *
+     * @param connection La connexion du pair
+     * @return L'IP réelle ou null si impossible à extraire
+     */
+    private String extractRealIpFromSocket(GestionConnection connection) {
+        try {
+            java.net.SocketAddress remoteAddr = connection.getRemoteAddress();
+            if (remoteAddr instanceof java.net.InetSocketAddress) {
+                java.net.InetSocketAddress inetAddr = (java.net.InetSocketAddress) remoteAddr;
+                String ip = inetAddr.getAddress().getHostAddress();
+                // Ignorer localhost/loopback pour les tests locaux
+                if (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1")) {
+                    return null; // Garder l'IP déclarée pour les tests locaux
+                }
+                return ip;
+            }
+        } catch (Exception e) {
+            // Ignorer
+        }
+        return null;
     }
 
     /**
