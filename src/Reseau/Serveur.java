@@ -231,6 +231,8 @@ public class Serveur {
                 processPeerListMessage(message);
             } else if (message.startsWith("NEW_PEER:")) {
                 processNewPeerMessage(message);
+            } else if (message.startsWith("DISCONNECT:")) {
+                processDisconnectMessage(message);
             } else {
                 processLegacyMoveMessage(message, sender);
             }
@@ -382,6 +384,35 @@ public class Serveur {
     }
 
     /**
+     * Traiter un message de type DISCONNECT:peerId
+     * Retire le joueur déconnecté de nos listes et propage l'info.
+     */
+    private void processDisconnectMessage(String message) {
+        try {
+            String peerId = message.substring(11).trim(); // Enlever "DISCONNECT:"
+
+            if (peerId.isEmpty() || peerId.equals(nodeId)) return;
+
+            // Vérifier si on connaissait ce pair
+            if (knownPeers.containsKey(peerId) || playerPositions.containsKey(peerId)) {
+                System.out.println("[" + nodeId + "] Notification de déconnexion reçue pour: " + peerId);
+
+                // Retirer le pair de nos listes
+                knownPeers.remove(peerId);
+                playerPositions.remove(peerId);
+
+                // Notifier le jeu de la déconnexion
+                onPeerDisconnected(peerId);
+
+                // Relayer la déconnexion aux autres pairs (pour s'assurer que tout le monde est informé)
+                broadcastToPeers(message);
+            }
+        } catch (Exception e) {
+            // Log error
+        }
+    }
+
+    /**
      * Traiter un message au format ancien (compatibilité) : "playerId:x,y"
      * En P2P maillé complet, pas de relais nécessaire.
      */
@@ -452,6 +483,16 @@ public class Serveur {
         connectedPeers.remove(peer);
         String peerId = peer.getRemotePeerId();
         if (peerId != null) {
+            // Retirer le pair des listes connues
+            knownPeers.remove(peerId);
+            playerPositions.remove(peerId);
+
+            // Informer les autres pairs de la déconnexion
+            broadcastToPeers("DISCONNECT:" + peerId);
+
+            System.out.println("[" + nodeId + "] " + peerId + " s'est déconnecté.");
+
+            // Callback pour les sous-classes
             onPeerDisconnected(peerId);
         }
     }
