@@ -75,23 +75,38 @@ public class Monstre {
         double newX = x + steering.getVelocityX();
         double newY = y + steering.getVelocityY();
 
-        // Vérifier les collisions avec la hitbox si la map est définie
+        // Vérifier les collisions avec la hitbox
         if (map != null) {
-            // Vérifier si la nouvelle position est valide (pas dans un mur)
             if (!collidesWithWall(newX, newY)) {
+                // Pas de collision : on avance normalement
                 x = newX;
                 y = newY;
             } else {
-                // Essayer de glisser le long du mur
+                // COLLISION ! On essaie de glisser.
+                boolean movedX = false;
+                boolean movedY = false;
+
+                // Essai mouvement horizontal uniquement (Glissade sur mur vertical)
                 if (!collidesWithWall(newX, y)) {
                     x = newX;
-                } else if (!collidesWithWall(x, newY)) {
-                    y = newY;
+                    movedX = true;
+                    // IMPORTANT : On a tapé un mur horizontal (en Y), donc on annule la vitesse Y
+                    steering.killVelocityY();
                 }
-                // Sinon, on reste sur place
+                // Essai mouvement vertical uniquement (Glissade sur mur horizontal)
+                else if (!collidesWithWall(x, newY)) {
+                    y = newY;
+                    movedY = true;
+                    // IMPORTANT : On a tapé un mur vertical (en X), donc on annule la vitesse X
+                    steering.killVelocityX();
+                }
+
+                // Si on est bloqué des deux côtés (coin)
+                if (!movedX && !movedY) {
+                    steering.reset(); // Arrêt complet pour ne pas accumuler de force dans le mur
+                }
             }
         } else {
-            // Pas de map, appliquer la vélocité directement
             x = newX;
             y = newY;
         }
