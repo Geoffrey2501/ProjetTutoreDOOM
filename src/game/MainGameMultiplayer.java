@@ -1,6 +1,13 @@
 package game;
 
+import moteur_graphique.BSP.BSPParcours;
+import moteur_graphique.BSP.CollisionBSP;
+import moteur_graphique.BSP.MapMur;
+import moteur_graphique.BSP.Mur;
+import moteur_graphique.CollisionStrategy;
+import moteur_graphique.GameRenderer;
 import moteur_graphique.Window;
+import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
 import entite.Joueur;
@@ -8,6 +15,7 @@ import entite.Sprite;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -21,6 +29,10 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
     private static final Logger LOGGER = Logger.getLogger(MainGameMultiplayer.class.getName());
 
     private final MapBool map;
+    private MapMur mapMur;
+
+    private final CollisionStrategy collision;
+
     private final Joueur joueur;
 
     //séparation : Window pour l'UI/Fenêtre, GameRenderer pour le calcul/rendu
@@ -56,15 +68,20 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
         // 1. Initialisation du moteur de rendu (logique pure)
         raycasting = new Raycasting(map, joueur);
 
+        window = new Window(1920, 1080);
         // 2. Initialisation de la fenêtre (UI)
         // On définit une taille par défaut, par exemple 1280x720 ou 1920x1080
-        window = new Window(1920, 1080);
 
-        //GameRenderer r = new TopDownRenderer(map, joueur);
-        //window.setRenderer(r);
+//        GameRenderer r = raycasting;
+//        collision = new CollisionRaycasting(map);
+
+        mapMur = new MapMur("assets/maps/mapBSP.txt");
+
+        GameRenderer r = new BSPParcours(joueur, this.mapMur);
+        collision = new CollisionBSP(mapMur);
 
         // 3. On lie le moteur à la fenêtre
-        window.setRenderer(raycasting);
+        window.setRenderer(r);
 
         // 4. Gestion des Inputs sur la fenêtre
         window.addInputListener(input);
@@ -184,15 +201,20 @@ public class MainGameMultiplayer implements Runnable, NetworkListener {
 
     private boolean applyMovement(double dx, double dy) {
         boolean moved = false;
-        double nextX = joueur.getX() + dx;
-        double nextY = joueur.getY() + dy;
+        double currentX = joueur.getX();
+        double currentY = joueur.getY();
+        double nextX = currentX + dx;
+        double nextY = currentY + dy;
 
-        if (!map.isWall((int) nextX, (int) joueur.getY())) {
+        double playerRadius = 0.3;
+
+        if(!collision.isColliding(nextX, currentY, playerRadius)) {
             joueur.setX(nextX);
+            currentX = nextX;
             moved = true;
         }
 
-        if (!map.isWall((int) joueur.getX(), (int) nextY)) {
+        if(!collision.isColliding(currentX, nextY, playerRadius)) {
             joueur.setY(nextY);
             moved = true;
         }
