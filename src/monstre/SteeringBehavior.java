@@ -5,9 +5,9 @@ package monstre;
  * pour des déplacements naturels et fluides.
  */
 public class SteeringBehavior {
-    private double maxVelocity = 10.0;
-    private double maxForce = 0.2;
-    private double arrivalRadius = 15.0;
+    private double maxVelocity = 3.0;
+    private double maxForce = 0.1;
+    private double arrivalRadius = 50.0;
     private double slowingRadius = 60.0;
 
     private double velocityX = 0;
@@ -79,6 +79,14 @@ public class SteeringBehavior {
 
             rotation += rotationDiff * 0.15; // Rotation lissée
         }
+    }
+
+    public void killVelocityX() {
+        this.velocityX = 0;
+    }
+
+    public void killVelocityY() {
+        this.velocityY = 0;
     }
 
     private double clamp(double value, double min, double max) {
