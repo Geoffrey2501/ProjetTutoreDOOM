@@ -1,0 +1,18 @@
+@startuml
+[*] --> Attente
+
+state Attente
+
+state Patrouille
+
+state Poursuite
+
+Attente --> Patrouille : apres(delai)
+Patrouille --> Attente : finPatrouille
+
+Attente --> Poursuite : cibleDetectee
+Patrouille --> Poursuite : cibleDetectee
+
+Poursuite --> Attente : ciblePerdue
+@enduml
+
