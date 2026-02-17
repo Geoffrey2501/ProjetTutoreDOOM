@@ -6,6 +6,7 @@ import moteur_graphique.BSP.MapMur;
 import moteur_graphique.CollisionStrategy;
 import moteur_graphique.GameRenderer;
 import moteur_graphique.Window;
+import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
 import entite.Joueur;
@@ -15,7 +16,6 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.*;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Classe principale du jeu multijoueur.
@@ -24,21 +24,14 @@ import java.util.logging.Logger;
  */
 public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
-    private static final Logger LOGGER = Logger.getLogger(MainGameMultiplayer.class.getName());
-
     // === Composants du jeu ===
-    private final MapBool map;
-    private MapMur mapMur;
-
     private final CollisionStrategy collision;
 
     private final Joueur joueur;
     private final Window window;
-    private final Raycasting raycasting;
     private final Input input;
 
     // === Contrôleurs ===
-    private final PlayerController playerController;
     private final MouseGestion mouseCaptureHandler;
     private final PlayerSpriteManager spriteManager;
     private final GameLoop gameLoop;
@@ -54,55 +47,38 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
      * @param serverPort port du serveur/pair à rejoindre
      */
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
-        // 1. Initialisation de la carte et du joueur
-        map = new MapBool(GameConfig.MAP_PATH);
+        window = new Window(1920, 1080);
+
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
 
-        // 2. Initialisation du moteur de rendu
-        raycasting = new Raycasting(map, joueur);
+         MapBool map = new MapBool("assets/maps/map.txt");
+         Raycasting raycasting = new Raycasting(map, joueur);
+//         GameRenderer r = raycasting;
+//         collision = new CollisionRaycasting(map);
 
-        window = new Window(1920, 1080);
-        // 2. Initialisation de la fenêtre (UI)
-        // On définit une taille par défaut, par exemple 1280x720 ou 1920x1080
-
-//        GameRenderer r = raycasting;
-//        collision = new CollisionRaycasting(map);
-
-        mapMur = new MapMur("assets/maps/mapBSP.txt");
-
-        GameRenderer r = new BSPParcours(joueur, this.mapMur);
+        MapMur mapMur = new MapMur("assets/maps/mapBSP.txt");
+        GameRenderer r = new BSPParcours(joueur, mapMur);
         collision = new CollisionBSP(mapMur);
 
-        // 3. On lie le moteur à la fenêtre
         window.setRenderer(r);
-
-        // 4. Gestion des Inputs sur la fenêtre
 
         window.addInputListener(input);
 
-        // 4. Initialisation des contrôleurs
-        playerController = new PlayerController(joueur, map, input);
         mouseCaptureHandler = new MouseGestion(window, input);
 
-        // 5. Initialisation du réseau
         network = new GameNetworkAdapter(playerId, "localhost", port);
         network.setLocalPlayer(joueur);
         network.setNetworkListener(this);
         network.start();
 
-        // 6. Initialisation du gestionnaire de sprites
         spriteManager = new PlayerSpriteManager(raycasting, network);
 
-        // 7. Initialisation de la boucle de jeu
         gameLoop = new GameLoop(this);
 
-        // 8. Connexion au serveur/pair si spécifié
-        if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
+        if (serverIp != null && !serverIp.isEmpty() && serverPort > 0)
             network.connectToPlayer("Server", serverIp, serverPort);
-        }
 
-        // Log de connexion
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
 
@@ -115,28 +91,24 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     @Override
     public void update(double delta) {
-        // Mise à jour de la capture de la souris
         mouseCaptureHandler.update();
 
-        // Mise à jour des mouvements du joueur
-        boolean moved = playerController.update(delta);
+        double moveSpeed = 1.5 * delta;
+        double rotSpeed = 2.0 * delta;
 
-        // Gestion de la rotation à la souris
+        boolean moved = handleMovement(moveSpeed);
+        moved |= handleKeyboardRotation(rotSpeed);
+
         int deltaX = mouseCaptureHandler.handleMouseRotation();
         if (deltaX != 0) {
-            playerController.applyMouseRotation(deltaX);
+            joueur.setAngle(joueur.getAngle() + deltaX * GameConfig.MOUSE_SENSITIVITY);
             moved = true;
         }
 
-        // Envoi de la position si le joueur a bougé
-        if (moved) {
-            network.sendPlayerPosition();
-        }
+        if (moved) network.sendPlayerPosition();
 
-        // Gestion du scoreboard
         updateScoreboard();
 
-        // Mise à jour des sprites des joueurs distants
         spriteManager.update(delta);
     }
 
@@ -257,7 +229,6 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     public void stop() {
         gameLoop.stop();
     }
-
 
     /**
      * Récupère l'adresse IP locale de la machine.

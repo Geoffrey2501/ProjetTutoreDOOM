@@ -35,7 +35,6 @@ public class BSPParcours implements GameRenderer {
             if(points != null) {
                 List<FourPoints> pointsAfterFilledScreen = filledScreen.add(points);
                 if (pointsAfterFilledScreen != null) {
-                    System.out.println("pointsAfterFilledScreen:" + pointsAfterFilledScreen.get(0).x0 + " " + pointsAfterFilledScreen.get(0).y0 + " " + pointsAfterFilledScreen.get(0).x1 + " " + pointsAfterFilledScreen.get(0).y1 + " " + pointsAfterFilledScreen.get(0).x2 + " " + pointsAfterFilledScreen.get(0).y2 + " " + pointsAfterFilledScreen.get(0).x3 + " " + pointsAfterFilledScreen.get(0).y3);
                     pointsToDraw.addAll(pointsAfterFilledScreen);
                 }
             }
