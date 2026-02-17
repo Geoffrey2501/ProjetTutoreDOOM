@@ -167,6 +167,11 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         return moved;
     }
 
+    @Override
+    public void setFPS(int fps) {
+        window.setFPS(fps);
+    }
+
     private boolean applyMovement(double dx, double dy) {
         boolean moved = false;
         double currentX = joueur.getX();
