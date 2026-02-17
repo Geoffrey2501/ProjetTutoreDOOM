@@ -15,6 +15,25 @@ public class Window extends JFrame {
     private final CanvasPanel panelDessin;
     private GameRenderer renderer;
 
+    private int currentFps = 0;
+
+    public void setFPS(int fps) {
+        this.currentFps = fps;
+    }
+
+    private void dessinerFPS(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 14));
+
+        // Petit fond sombre pour la lisibilité
+        g2d.setColor(new Color(0, 0, 0, 150));
+        g2d.fillRect(5, 5, 70, 22);
+
+        // Texte en jaune
+        g2d.setColor(Color.YELLOW);
+        g2d.drawString("FPS: " + currentFps, 12, 21);
+    }
+
     // --- GESTION UI (Logs & Scoreboard) ---
     private final List<LogMessage> logMessages = new CopyOnWriteArrayList<>();
     private static final int MAX_LOGS = 5;
@@ -153,6 +172,7 @@ public class Window extends JFrame {
             }
 
             // 2. Dessiner l'UI par dessus
+            dessinerFPS(g);
             dessinerLogs(g);
             if (showScoreboard) {
                 dessinerScoreboard(g, getWidth(), getHeight());
