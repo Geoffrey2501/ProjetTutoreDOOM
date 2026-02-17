@@ -118,8 +118,12 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         // Mise à jour de la capture de la souris
         mouseCaptureHandler.update();
 
+        double moveSpeed = 1.5 * delta;
+        double rotSpeed = 2.0 * delta;
+
         // Mise à jour des mouvements du joueur
-        boolean moved = playerController.update(delta);
+        boolean moved = handleMovement(moveSpeed);
+        moved |= handleKeyboardRotation(rotSpeed);
 
         // Gestion de la rotation à la souris
         int deltaX = mouseCaptureHandler.handleMouseRotation();
