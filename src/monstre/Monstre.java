@@ -17,6 +17,9 @@ public class Monstre {
     private double waypointTolerance = 15.0;
     private boolean arrived = false;
     private Map map;  // Référence à la map pour vérifier les collisions
+    private int stuckCounter = 0;          // Compteur de frames bloqué
+    private static final int STUCK_THRESHOLD = 40; // Frames avant de skip le waypoint
+    private double prevX, prevY;           // Position précédente pour détecter le blocage
 
     public Monstre(double x, double y) {
         this.x = x;
@@ -38,6 +41,7 @@ public class Monstre {
         chemin.clear();
         waypointIndex = 0;
         arrived = false;
+        stuckCounter = 0;
         steering.reset();
 
         if (noeudFinal == null) return;
@@ -48,6 +52,103 @@ public class Monstre {
             chemin.add(0, current);
             current = current.getParent();
         }
+
+        // Trouver le meilleur point d'entrée dans le chemin
+        optimiserPointEntree();
+    }
+
+    /**
+     * Trouve le waypoint optimal pour rejoindre le chemin.
+     * Ignore les premiers waypoints si le monstre peut atteindre directement
+     * un waypoint plus avancé sans traverser de mur.
+     */
+    private void optimiserPointEntree() {
+        if (chemin.isEmpty() || map == null) return;
+
+        int meilleurIndex = 0;
+        double meilleureDistance = Double.MAX_VALUE;
+
+        // Parcourir le chemin pour trouver le waypoint le plus avancé accessible
+        for (int i = 0; i < chemin.size(); i++) {
+            Noeud waypoint = chemin.get(i);
+            double distance = Math.sqrt(Math.pow(waypoint.getX() - x, 2) + Math.pow(waypoint.getY() - y, 2));
+
+            // Vérifier si on peut atteindre ce waypoint en ligne directe
+            boolean accessible = !map.traverseMurAvecRayon((int) x, (int) y, waypoint.getX(), waypoint.getY(), RAYON);
+
+            if (accessible) {
+                // Privilégier les waypoints plus avancés dans le chemin (plus proches de la cible)
+                // tout en restant à une distance raisonnable
+                double score = distance - (i * 10); // Bonus pour les waypoints plus avancés
+                if (score < meilleureDistance) {
+                    meilleureDistance = score;
+                    meilleurIndex = i;
+                }
+            }
+        }
+
+        waypointIndex = meilleurIndex;
+    }
+
+    /**
+     * Mode poursuite directe : se dirige en ligne droite vers une cible
+     * sans chemin RRT*. Utilisé en attendant que le RRT* soit calculé.
+     */
+    public void seekDirect(double targetX, double targetY) {
+        double distance = Math.sqrt(Math.pow(targetX - x, 2) + Math.pow(targetY - y, 2));
+
+        // Utiliser seekAggressive quand on est proche pour éviter les oscillations
+        if (distance < 50) {
+            steering.seekAggressive(x, y, targetX, targetY);
+        } else {
+            steering.seek(x, y, targetX, targetY);
+        }
+
+        // Force de séparation des murs
+        if (map != null) {
+            applyWallSeparation();
+        }
+
+        double newX = x + steering.getVelocityX();
+        double newY = y + steering.getVelocityY();
+
+        if (map != null) {
+            if (!collidesWithWall(newX, newY)) {
+                x = newX;
+                y = newY;
+            } else {
+                boolean movedX = false;
+                if (!collidesWithWall(newX, y)) {
+                    x = newX;
+                    movedX = true;
+                }
+                if (!collidesWithWall(movedX ? newX : x, newY)) {
+                    y = newY;
+                }
+                if (!movedX) steering.killVelocityX();
+            }
+        } else {
+            x = newX;
+            y = newY;
+        }
+    }
+
+    /**
+     * Réinitialise le monstre pour un nouveau calcul de chemin.
+     * Ne stoppe pas le mouvement en cours.
+     */
+    public void resetChemin() {
+        chemin.clear();
+        waypointIndex = 0;
+        arrived = false;
+        stuckCounter = 0;
+    }
+
+    /**
+     * Vérifie si le monstre a un chemin à suivre
+     */
+    public boolean aChemin() {
+        return !chemin.isEmpty() && !arrived;
     }
 
     /**
@@ -55,7 +156,7 @@ public class Monstre {
      */
     public void update() {
         if (chemin.isEmpty() || waypointIndex >= chemin.size()) {
-            arrived = true;
+            arreter();
             return;
         }
 
@@ -66,10 +167,36 @@ public class Monstre {
         if (distance < waypointTolerance && waypointIndex < chemin.size() - 1) {
             waypointIndex++;
             target = chemin.get(waypointIndex);
+            distance = Math.sqrt(Math.pow(target.getX() - x, 2) + Math.pow(target.getY() - y, 2));
         }
 
-        // Utiliser seek pour tous les waypoints
-        steering.seek(x, y, target.getX(), target.getY());
+        // Dernier waypoint : vérifier l'arrivée avec un seuil adapté à la vitesse
+        boolean estDernierWaypoint = (waypointIndex == chemin.size() - 1);
+        double seuilArrivee = Math.max(steering.getSpeed() + 1, 5.0); // Seuil dynamique
+
+        if (estDernierWaypoint && distance < seuilArrivee) {
+            arreter();
+            // Snap à la position finale
+            x = target.getX();
+            y = target.getY();
+            return;
+        }
+
+        // Utiliser arrive() pour le dernier waypoint (ralentissement), seek() sinon
+        if (estDernierWaypoint) {
+            steering.arrive(x, y, target.getX(), target.getY());
+        } else {
+            steering.seek(x, y, target.getX(), target.getY());
+        }
+
+        // Force de séparation des murs (repousse le monstre avant qu'il ne se colle)
+        if (map != null) {
+            applyWallSeparation();
+        }
+
+        // Sauvegarder la position avant déplacement (pour détection de blocage)
+        prevX = x;
+        prevY = y;
 
         // Calculer la nouvelle position
         double newX = x + steering.getVelocityX();
@@ -82,28 +209,28 @@ public class Monstre {
                 x = newX;
                 y = newY;
             } else {
-                // COLLISION ! On essaie de glisser.
+                // COLLISION ! Glissade indépendante sur chaque axe
                 boolean movedX = false;
                 boolean movedY = false;
 
-                // Essai mouvement horizontal uniquement (Glissade sur mur vertical)
+                // Essai mouvement horizontal (glissade sur mur vertical)
                 if (!collidesWithWall(newX, y)) {
                     x = newX;
                     movedX = true;
-                    // IMPORTANT : On a tapé un mur horizontal (en Y), donc on annule la vitesse Y
-                    steering.killVelocityY();
                 }
-                // Essai mouvement vertical uniquement (Glissade sur mur horizontal)
-                else if (!collidesWithWall(x, newY)) {
+                // Essai mouvement vertical (glissade sur mur horizontal)
+                if (!collidesWithWall(movedX ? newX : x, newY)) {
                     y = newY;
                     movedY = true;
-                    // IMPORTANT : On a tapé un mur vertical (en X), donc on annule la vitesse X
-                    steering.killVelocityX();
                 }
 
-                // Si on est bloqué des deux côtés (coin)
+                // Annuler les composantes de vélocité bloquées
+                if (!movedX) steering.killVelocityX();
+                if (!movedY) steering.killVelocityY();
+
+                // Si complètement bloqué (coin)
                 if (!movedX && !movedY) {
-                    steering.reset(); // Arrêt complet pour ne pas accumuler de force dans le mur
+                    steering.reset();
                 }
             }
         } else {
@@ -111,10 +238,28 @@ public class Monstre {
             y = newY;
         }
 
-        // Vérifier si arrivé à destination
-        if (waypointIndex == chemin.size() - 1 && distance < 5) {
-            arrived = true;
+        // Détection de blocage : si le monstre n'a presque pas bougé
+        double deplacement = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+        if (deplacement < 0.3) {
+            stuckCounter++;
+        } else {
+            stuckCounter = 0;
         }
+
+        // Si bloqué trop longtemps, sauter au waypoint suivant
+        if (stuckCounter >= STUCK_THRESHOLD && waypointIndex < chemin.size() - 1) {
+            waypointIndex++;
+            stuckCounter = 0;
+            steering.reset();
+        }
+    }
+
+    /**
+     * Arrête le monstre : vélocité à zéro, marqué comme arrivé
+     */
+    private void arreter() {
+        arrived = true;
+        steering.reset();
     }
 
     // Getters
@@ -147,6 +292,38 @@ public class Monstre {
 
     public SteeringBehavior getSteering() {
         return steering;
+    }
+
+    /**
+     * Applique une force de séparation qui repousse le monstre des murs proches.
+     * Sonde autour du monstre et pousse dans la direction opposée aux murs détectés.
+     */
+    private void applyWallSeparation() {
+        double separationX = 0;
+        double separationY = 0;
+        double probeDistance = RAYON + 4; // Sonder un peu plus loin que la hitbox
+        int numProbes = 8;
+
+        for (int i = 0; i < numProbes; i++) {
+            double angle = 2 * Math.PI * i / numProbes;
+            int probeX = (int) (x + probeDistance * Math.cos(angle));
+            int probeY = (int) (y + probeDistance * Math.sin(angle));
+
+            if (map.estDansMur(probeX, probeY)) {
+                // Pousser dans la direction opposée au mur
+                separationX -= Math.cos(angle);
+                separationY -= Math.sin(angle);
+            }
+        }
+
+        // Normaliser et appliquer la force de séparation
+        double mag = Math.sqrt(separationX * separationX + separationY * separationY);
+        if (mag > 0) {
+            double separationForce = 0.5; // Force de répulsion assez forte
+            separationX = (separationX / mag) * separationForce;
+            separationY = (separationY / mag) * separationForce;
+            steering.applySeparation(separationX, separationY);
+        }
     }
 
     /**

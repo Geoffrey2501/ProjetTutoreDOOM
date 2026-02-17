@@ -9,12 +9,27 @@ import java.util.List;
 
 public class RRTVisualisation extends JPanel {
     private final Map map;
-    private final List<Noeud> noeuds;
-    private final List<Noeud> chemin;
+    private List<Noeud> noeuds;
+    private List<Noeud> chemin;
     private Monstre monstre;
+
+    // Marqueur de la cible (clic souris)
+    private int cibleX = -1, cibleY = -1;
+    private boolean afficherCible = false;
 
     // Cache pour ne pas redessiner le fond statique à chaque image (Optimisation)
     private BufferedImage backgroundCache;
+
+    public RRTVisualisation(Map map, Monstre monstre) {
+        this.map = map;
+        this.monstre = monstre;
+        this.noeuds = new ArrayList<>();
+        this.chemin = new ArrayList<>();
+
+        // Configuration graphique
+        this.setDoubleBuffered(true);
+        this.setPreferredSize(new Dimension(map.getLargeur(), map.getHauteur()));
+    }
 
     public RRTVisualisation(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin, Monstre monstre) {
         this.map = map;
@@ -25,6 +40,33 @@ public class RRTVisualisation extends JPanel {
         // Configuration graphique
         this.setDoubleBuffered(true);
         this.setPreferredSize(new Dimension(map.getLargeur(), map.getHauteur()));
+    }
+
+    /**
+     * Met à jour l'arbre RRT et le chemin optimal après un nouveau calcul.
+     * Invalide le cache du fond pour redessiner.
+     */
+    public void updateRRT(List<Noeud> noeuds, Noeud fin) {
+        this.noeuds = noeuds;
+        this.chemin = reconstruireChemin(fin);
+        this.backgroundCache = null; // Invalider le cache
+    }
+
+    /**
+     * Définit la position de la cible (clic souris) pour l'afficher.
+     */
+    public void setCible(int x, int y) {
+        this.cibleX = x;
+        this.cibleY = y;
+        this.afficherCible = true;
+        this.backgroundCache = null; // Invalider le cache
+    }
+
+    /**
+     * Cache le marqueur de cible.
+     */
+    public void cacherCible() {
+        this.afficherCible = false;
     }
 
     // Méthode appelée par le contrôleur pour mettre à jour l'affichage
@@ -101,6 +143,17 @@ public class RRTVisualisation extends JPanel {
                 g.drawLine(chemin.get(i).getX(), chemin.get(i).getY(),
                         chemin.get(i + 1).getX(), chemin.get(i + 1).getY());
             }
+        }
+
+        // Marqueur de cible (croix verte)
+        if (afficherCible && cibleX >= 0 && cibleY >= 0) {
+            g.setColor(new Color(0, 200, 0));
+            g.setStroke(new BasicStroke(3));
+            int taille = 10;
+            g.drawLine(cibleX - taille, cibleY - taille, cibleX + taille, cibleY + taille);
+            g.drawLine(cibleX + taille, cibleY - taille, cibleX - taille, cibleY + taille);
+            g.setColor(new Color(0, 200, 0, 80));
+            g.fillOval(cibleX - 15, cibleY - 15, 30, 30);
         }
         g.dispose();
     }
