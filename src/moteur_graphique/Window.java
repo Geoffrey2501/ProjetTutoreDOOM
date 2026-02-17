@@ -32,6 +32,19 @@ public class Window extends JFrame {
             new Color(255, 100, 200), new Color(150, 255, 150)
     };
 
+    /**
+     * Tronquer un nom s'il dépasse la longueur maximale
+     */
+    private static final int MAX_NAME_LENGTH = 20;
+
+    private String truncateName(String name) {
+        if (name == null) return "";
+        if (name.length() <= MAX_NAME_LENGTH) {
+            return name;
+        }
+        return name.substring(0, MAX_NAME_LENGTH - 3) + "...";
+    }
+
     // Classe interne pour les logs (déplacée ici)
     private static class LogMessage {
         String text;
@@ -171,30 +184,77 @@ public class Window extends JFrame {
     }
 
     private void dessinerScoreboard(Graphics g, int screenWidth, int screenHeight) {
-        // (Copier ici tout le code de dessinerScoreboard de l'ancien Raycasting.java)
-        // Je le simplifie pour la réponse, mais tu remets ton code exact ici
         Graphics2D g2d = (Graphics2D) g;
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Dimensions du tableau
         int tableWidth = 400;
-        int tableHeight = 50 + (playerList.size() * 40) + 20;
+        int rowHeight = 40;
+        int headerHeight = 50;
+        int tableHeight = headerHeight + (playerList.size() * rowHeight) + 20;
+
+        // Position centrée
         int tableX = (screenWidth - tableWidth) / 2;
         int tableY = (screenHeight - tableHeight) / 2;
 
+        // Fond semi-transparent
         g2d.setColor(new Color(0, 0, 0, 200));
         g2d.fillRoundRect(tableX, tableY, tableWidth, tableHeight, 20, 20);
 
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 24));
-        g2d.drawString("JOUEURS EN LIGNE", tableX + 80, tableY + 35);
+        // Bordure
+        g2d.setColor(new Color(100, 100, 100));
+        g2d.setStroke(new BasicStroke(3));
+        g2d.drawRoundRect(tableX, tableY, tableWidth, tableHeight, 20, 20);
 
-        g2d.setFont(new Font(FONT_ARIAL, Font.PLAIN, 18));
-        int y = tableY + 80;
-        int i = 1;
-        for(String p : playerList) {
-            g2d.setColor(getPlayerColor(p));
+        // Titre
+        g2d.setFont(new Font("Arial", Font.BOLD, 24));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String title = "JOUEURS EN LIGNE";
+        int titleWidth = fmTitle.stringWidth(title);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(title, tableX + (tableWidth - titleWidth) / 2, tableY + 35);
+
+        // Ligne de séparation sous le titre
+        g2d.setColor(new Color(100, 100, 100));
+        g2d.drawLine(tableX + 20, tableY + headerHeight, tableX + tableWidth - 20, tableY + headerHeight);
+
+        // Liste des joueurs
+        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+        FontMetrics fm = g2d.getFontMetrics();
+
+        int y = tableY + headerHeight + 30;
+        int index = 1;
+
+        for (String playerName : playerList) {
+            // Indicateur pour le joueur local
+            boolean isLocal = playerName.equals(localPlayerName);
+            Color playerColor = getPlayerColor(playerName);
+
+            // Numéro du joueur
+            g2d.setColor(new Color(150, 150, 150));
+            g2d.drawString(String.valueOf(index) + ".", tableX + 30, y);
+
+            // Icône joueur (petit cercle coloré)
+            g2d.setColor(playerColor);
             g2d.fillOval(tableX + 60, y - 12, 15, 15);
-            g2d.setColor(Color.WHITE);
-            g2d.drawString(p, tableX + 85, y);
-            y += 40;
+
+            // Nom du joueur
+            // Version plus claire de la couleur pour le texte
+            Color textColor = new Color(
+                    Math.min(255, playerColor.getRed() + 55),
+                    Math.min(255, playerColor.getGreen() + 55),
+                    Math.min(255, playerColor.getBlue() + 55)
+            );
+            g2d.setColor(textColor);
+
+            if (isLocal) {
+                g2d.drawString(truncateName(playerName) + " (vous)", tableX + 85, y);
+            } else {
+                g2d.drawString(truncateName(playerName), tableX + 85, y);
+            }
+
+            y += rowHeight;
+            index++;
         }
     }
 

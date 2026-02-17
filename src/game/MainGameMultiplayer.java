@@ -1,5 +1,10 @@
 package game;
 
+import moteur_graphique.BSP.BSPParcours;
+import moteur_graphique.BSP.CollisionBSP;
+import moteur_graphique.BSP.MapMur;
+import moteur_graphique.CollisionStrategy;
+import moteur_graphique.GameRenderer;
 import moteur_graphique.Window;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
@@ -23,6 +28,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     // === Composants du jeu ===
     private final MapBool map;
+    private MapMur mapMur;
+
+    private final CollisionStrategy collision;
+
     private final Joueur joueur;
     private final Window window;
     private final Raycasting raycasting;
@@ -53,9 +62,23 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         // 2. Initialisation du moteur de rendu
         raycasting = new Raycasting(map, joueur);
 
-        // 3. Initialisation de la fenêtre
-        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT);
-        window.setRenderer(raycasting);
+        window = new Window(1920, 1080);
+        // 2. Initialisation de la fenêtre (UI)
+        // On définit une taille par défaut, par exemple 1280x720 ou 1920x1080
+
+//        GameRenderer r = raycasting;
+//        collision = new CollisionRaycasting(map);
+
+        mapMur = new MapMur("assets/maps/mapBSP.txt");
+
+        GameRenderer r = new BSPParcours(joueur, this.mapMur);
+        collision = new CollisionBSP(mapMur);
+
+        // 3. On lie le moteur à la fenêtre
+        window.setRenderer(r);
+
+        // 4. Gestion des Inputs sur la fenêtre
+
         window.addInputListener(input);
 
         // 4. Initialisation des contrôleurs
@@ -138,7 +161,75 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         }
     }
 
-    // === Implémentation de NetworkListener ===
+    private boolean handleMovement(double moveSpeed) {
+        double angle = joueur.getAngle();
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+
+        double dx = 0;
+        double dy = 0;
+        boolean moved = false;
+
+        if (input.isForward()) {
+            dx += cos;
+            dy += sin;
+        }
+        if (input.isBackward()) {
+            dx -= cos;
+            dy -= sin;
+        }
+        if (input.isStrafeLeft()) {
+            dx += sin;
+            dy -= cos;
+        }
+        if (input.isStrafeRight()) {
+            dx -= sin;
+            dy += cos;
+        }
+
+        if (dx != 0 || dy != 0) {
+            dx *= moveSpeed;
+            dy *= moveSpeed;
+            moved = applyMovement(dx, dy);
+        }
+
+        return moved;
+    }
+
+    private boolean applyMovement(double dx, double dy) {
+        boolean moved = false;
+        double currentX = joueur.getX();
+        double currentY = joueur.getY();
+        double nextX = currentX + dx;
+        double nextY = currentY + dy;
+
+        double playerRadius = 0.3;
+
+        if(!collision.isColliding(nextX, currentY, playerRadius)) {
+            joueur.setX(nextX);
+            currentX = nextX;
+            moved = true;
+        }
+
+        if(!collision.isColliding(currentX, nextY, playerRadius)) {
+            joueur.setY(nextY);
+            moved = true;
+        }
+
+        return moved;
+    }
+
+    private boolean handleKeyboardRotation(double rotSpeed) {
+        double angle = joueur.getAngle();
+        if (input.isTurnLeft()) {
+            joueur.setAngle(angle - rotSpeed);
+            return true;
+        } else if (input.isTurnRight()) {
+            joueur.setAngle(angle + rotSpeed);
+            return true;
+        }
+        return false;
+    }
 
     @Override
     public void onPlayerPositionUpdate(String playerId, double x, double y, double angle) {
