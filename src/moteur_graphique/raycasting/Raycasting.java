@@ -1,5 +1,6 @@
 package moteur_graphique.raycasting;
 
+import game.GameConfig;
 import moteur_graphique.GameRenderer; // Importer l'interface
 import entite.Joueur;
 import entite.Sprite;
@@ -22,7 +23,6 @@ public class Raycasting implements GameRenderer {
 
     private MapBool map;
     private Joueur joueur;
-    private static final int FOV = 60;
     private static final int NUM_RAYS = 1000;
 
     private final List<Sprite> sprites = new CopyOnWriteArrayList<>();
@@ -401,7 +401,7 @@ public class Raycasting implements GameRenderer {
         dessinerFond(screenWidth, screenHeight);
 
         // 2. Raycasting (Murs)
-        double fov = Math.toRadians(FOV);
+        double fov = Math.toRadians(GameConfig.FOV);
         lancerRayons(screenWidth, screenHeight, fov);
 
         // 3. Copier les pixels calculés sur l'écran

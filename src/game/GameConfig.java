@@ -7,7 +7,7 @@ package game;
 public class GameConfig {
 
     // Configuration de la boucle de jeu
-    public static final int FPS = 60;
+    public static final int FPS = 80;
     public static final long OPTIMAL_TIME = 1_000_000_000 / FPS;
 
     // Configuration du joueur
@@ -27,6 +27,8 @@ public class GameConfig {
     // Configuration de la fenêtre
     public static final int WINDOW_WIDTH = 1920;
     public static final int WINDOW_HEIGHT = 1080;
+
+    public static final int FOV = 60;
 
 }
 

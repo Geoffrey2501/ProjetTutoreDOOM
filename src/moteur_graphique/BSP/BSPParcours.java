@@ -1,6 +1,7 @@
 package moteur_graphique.BSP;
 
 import entite.Joueur;
+import game.GameConfig;
 import moteur_graphique.GameRenderer;
 
 import java.util.ArrayList;
@@ -9,7 +10,6 @@ import java.util.List;
 public class BSPParcours implements GameRenderer {
 
     private Joueur joueur;
-    private static final int FOV = 60;
     private ArbreBSP arbreBSP;
 
     public BSPParcours(Joueur joueur, MapMur map) {
@@ -31,7 +31,7 @@ public class BSPParcours implements GameRenderer {
 
         Mur m = frontToBack.getNextWall();
         while(m != null && !filledScreen.isFull()) {
-            FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), FOV, joueur.getAngle(), width, height);
+            FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), GameConfig.FOV, joueur.getAngle(), width, height);
             if(points != null) {
                 List<FourPoints> pointsAfterFilledScreen = filledScreen.add(points);
                 if (pointsAfterFilledScreen != null) {
@@ -64,7 +64,7 @@ public class BSPParcours implements GameRenderer {
         return mursVisiblesSansDoublons;
     }
 
-    private List<Mur> getMursVisiblesAngle(double x, double y, double angle, int fov) {
+    public List<Mur> getMursVisiblesAngle(double x, double y, double angle, int fov) {
         //on fait un algo similaire à render, juste on n'a pas besoin de la reel taille d'écran.
         //on peut aussi avoir 1 de fov par exemple juste pour avoir le mur en face et limiter les calculs
         int width = 720;
