@@ -31,6 +31,7 @@ public class BSPParcours implements GameRenderer {
 
         Mur m = frontToBack.getNextWall();
         while(m != null && !filledScreen.isFull()) {
+
             FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), GameConfig.FOV, joueur.getAngle(), width, height);
             if(points != null) {
                 List<FourPoints> pointsAfterFilledScreen = filledScreen.add(points);
