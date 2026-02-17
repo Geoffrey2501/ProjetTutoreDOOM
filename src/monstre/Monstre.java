@@ -21,7 +21,7 @@ public class Monstre {
     private double x;
     private double y;
     private final SteeringBehavior steering;
-    private final List<Noeud> chemin;
+    private List<Noeud> chemin;
     private int waypointIndex = 0;
     private double waypointTolerance = 15.0;
     private boolean arrived = false;
@@ -41,12 +41,10 @@ public class Monstre {
     // Points de patrouille
     private Noeud pointA;
     private Noeud pointB;
-    private boolean versPointB = true;
-
-    // Cible pour la poursuite
-    private Noeud cible;
+    private Noeud destinationActuelle;  // Point vers lequel on se dirige
+    private static final double ZONE_ARRIVEE = 20.0;  // Rayon de la zone d'arrivée
+    private Target target;  // Cible dynamique (joueur)
     private double distanceDetection = 150.0;
-
     // ==================== CONSTRUCTEURS ====================
 
     public Monstre(double x, double y) {
@@ -114,114 +112,10 @@ public class Monstre {
     }
 
     /**
-     * Réinitialise le monstre pour un nouveau calcul de chemin.
-     */
-    public void resetChemin() {
-        chemin.clear();
-        waypointIndex = 0;
-        arrived = false;
-        stuckCounter = 0;
-    }
-
-    /**
-     * Met à jour la position du monstre le long du chemin (utilisé par MainChasse)
-     */
-    public void update() {
-        if (chemin.isEmpty() || waypointIndex >= chemin.size()) {
-            arreter();
-            return;
-        }
-
-        Noeud target = chemin.get(waypointIndex);
-        double distance = Math.sqrt(Math.pow(target.getX() - x, 2) + Math.pow(target.getY() - y, 2));
-
-        // Passer au waypoint suivant si assez proche
-        if (distance < waypointTolerance && waypointIndex < chemin.size() - 1) {
-            waypointIndex++;
-            target = chemin.get(waypointIndex);
-            distance = Math.sqrt(Math.pow(target.getX() - x, 2) + Math.pow(target.getY() - y, 2));
-        }
-
-        // Dernier waypoint : vérifier l'arrivée avec un seuil adapté à la vitesse
-        boolean estDernierWaypoint = (waypointIndex == chemin.size() - 1);
-        double seuilArrivee = Math.max(steering.getSpeed() + 1, 5.0);
-
-        if (estDernierWaypoint && distance < seuilArrivee) {
-            arreter();
-            x = target.getX();
-            y = target.getY();
-            return;
-        }
-
-        // Utiliser arrive() pour le dernier waypoint (ralentissement), seek() sinon
-        if (estDernierWaypoint) {
-            steering.arrive(x, y, target.getX(), target.getY());
-        } else {
-            steering.seek(x, y, target.getX(), target.getY());
-        }
-
-        // Force de séparation des murs
-        if (map != null) {
-            applyWallSeparation();
-        }
-
-        // Sauvegarder la position avant déplacement
-        prevX = x;
-        prevY = y;
-
-        // Calculer la nouvelle position
-        double newX = x + steering.getVelocityX();
-        double newY = y + steering.getVelocityY();
-
-        // Gestion des collisions
-        if (map != null) {
-            if (!collidesWithWall(newX, newY)) {
-                x = newX;
-                y = newY;
-            } else {
-                boolean movedX = false;
-                boolean movedY = false;
-
-                if (!collidesWithWall(newX, y)) {
-                    x = newX;
-                    movedX = true;
-                }
-                if (!collidesWithWall(movedX ? newX : x, newY)) {
-                    y = newY;
-                    movedY = true;
-                }
-
-                if (!movedX) steering.killVelocityX();
-                if (!movedY) steering.killVelocityY();
-                if (!movedX && !movedY) steering.reset();
-            }
-        } else {
-            x = newX;
-            y = newY;
-        }
-
-        // Détection de blocage
-        double deplacement = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
-        if (deplacement < 0.3) {
-            stuckCounter++;
-        } else {
-            stuckCounter = 0;
-        }
-
-        if (stuckCounter >= STUCK_THRESHOLD && waypointIndex < chemin.size() - 1) {
-            waypointIndex++;
-            stuckCounter = 0;
-            steering.reset();
-        }
-    }
-
-    // ==================== AUTOMATE À ÉTATS ====================
-
-    /**
      * Met à jour le monstre selon l'automate à états.
      * Gère les transitions entre Attente, Patrouille et Poursuite.
      */
-    public void updateAutomate() {
+    public void update() {
         long tempsActuel = System.currentTimeMillis();
         long deltaTemps = tempsActuel - dernierTemps;
         dernierTemps = tempsActuel;
@@ -264,67 +158,94 @@ public class Monstre {
             return;
         }
 
-        if (arrived) {
-            versPointB = !versPointB;
-            Noeud destination = versPointB ? pointB : pointA;
-            if (destination != null) {
-                setChemin(destination);
-            } else {
-                transitionVers(Etat.ATTENTE);
-                return;
+        // Vérifier si on est arrivé dans la zone de destination
+        if (destinationActuelle != null && estDansZone(destinationActuelle)) {
+            System.out.println("[Monstre] Arrivé dans la zone du point " +
+                    (destinationActuelle == pointA ? "A" : "B") + ", alternance vers l'autre point.");
+
+            // Alterner vers l'autre point
+            destinationActuelle = (destinationActuelle == pointA) ? pointB : pointA;
+            System.out.println("[Monstre] Nouvelle destination: " + (destinationActuelle == pointA ? "A" : "B"));
+
+            Noeud noeudFinal = RRT.trouverChemin((int) x, (int) y, destinationActuelle.getX(), destinationActuelle.getY());
+            if (noeudFinal != null) {
+                setChemin(noeudFinal);
             }
+            return;
         }
 
+        // Suivre le chemin RRT
         updateMouvement();
     }
 
     /**
-     * État POURSUITE : Poursuit la cible.
+     * Vérifie si le monstre est dans la zone d'un point donné.
+     *
+     * @param point Le point à vérifier
+     * @return true si le monstre est dans la zone
+     */
+    private boolean estDansZone(Noeud point) {
+        if (point == null) return false;
+        double distance = Math.sqrt(Math.pow(point.getX() - x, 2) + Math.pow(point.getY() - y, 2));
+        return distance <= ZONE_ARRIVEE;
+    }
+
+    /**
+     * Retourne la destination actuelle de patrouille.
+     */
+    public Noeud getDestinationActuelle() {
+        return destinationActuelle;
+    }
+
+
+    /**
+     * État POURSUITE : Poursuit la cible (joueur).
      */
     private void updatePoursuite() {
         if (!cibleDetectee()) {
+            System.out.println("[Monstre] Cible perdue, retour en ATTENTE");
             transitionVers(Etat.ATTENTE);
             return;
         }
 
-        if (cible != null && arrived) {
-            setChemin(cible);
+        // Se déplacer directement vers le joueur
+        if (target != null) {
+            seekDirect(target.getX(), target.getY());
         }
-
-        updateMouvement();
     }
 
     /**
      * Effectue une transition vers un nouvel état.
      */
     private void transitionVers(Etat nouvelEtat) {
+        System.out.println("[Monstre] Transition: " + etatActuel + " -> " + nouvelEtat);
         etatActuel = nouvelEtat;
         tempsAttente = 0;
+        steering.reset();
 
-        switch (nouvelEtat) {
-            case ATTENTE:
-                steering.reset();
-                break;
-            case PATROUILLE:
-                Noeud destination = versPointB ? pointB : pointA;
-                if (destination != null) {
-                    setChemin(destination);
-                }
-                break;
-            case POURSUITE:
-                if (cible != null) {
-                    setChemin(cible);
-                }
-                break;
+        // Si on revient en patrouille, aller vers le point le plus proche
+        if (nouvelEtat == Etat.PATROUILLE && pointA != null && pointB != null) {
+            double distA = Math.sqrt(Math.pow(pointA.getX() - x, 2) + Math.pow(pointA.getY() - y, 2));
+            double distB = Math.sqrt(Math.pow(pointB.getX() - x, 2) + Math.pow(pointB.getY() - y, 2));
+            destinationActuelle = (distA < distB) ? pointA : pointB;
+            System.out.println("[Monstre] Reprise patrouille vers point " + (destinationActuelle == pointA ? "A" : "B"));
+
+            // Recalculer le chemin
+            Noeud noeudFinal = RRT.trouverChemin((int) x, (int) y, destinationActuelle.getX(), destinationActuelle.getY());
+            if (noeudFinal != null) {
+                setChemin(noeudFinal);
+            }
         }
     }
 
     /**
-     * Vérifie si une cible est détectée dans le rayon de détection.
+     * Vérifie si la cible (joueur) est détectée dans le rayon de détection.
+     *
+     * @return true si la cible est visible et à portée
      */
     private boolean cibleDetectee() {
-        if (cible == null) return false;
-        double distance = Math.sqrt(Math.pow(cible.getX() - x, 2) + Math.pow(cible.getY() - y, 2));
+        if (target == null || !target.isVisible()) return false;
+        double distance = target.distanceFrom(x, y);
         return distance <= distanceDetection;
     }
 
@@ -340,24 +261,58 @@ public class Monstre {
         Noeud target = chemin.get(waypointIndex);
         double distance = distanceTo(target);
 
+        // Passer au waypoint suivant si assez proche
         if (distance < waypointTolerance && waypointIndex < chemin.size() - 1) {
             waypointIndex++;
             target = chemin.get(waypointIndex);
+            distance = distanceTo(target);
         }
 
-        steering.seek(x, y, target.getX(), target.getY());
+        // Dernier waypoint : vérifier l'arrivée avec un seuil adapté à la vitesse
+        boolean estDernierWaypoint = (waypointIndex == chemin.size() - 1);
+        double seuilArrivee = Math.max(steering.getSpeed() + 1, 5.0);
 
+        if (estDernierWaypoint && distance < seuilArrivee) {
+            arreter();
+            x = target.getX();
+            y = target.getY();
+            return;
+        }
+
+        // Utiliser arrive() pour le dernier waypoint (ralentissement), seek() sinon
+        if (estDernierWaypoint) {
+            steering.arrive(x, y, target.getX(), target.getY());
+        } else {
+            steering.seek(x, y, target.getX(), target.getY());
+        }
+
+        // Force de séparation des murs
         if (map != null) {
             applyWallSeparation();
         }
 
+        // Sauvegarder la position avant déplacement
+        prevX = x;
+        prevY = y;
+
+        // Calculer et appliquer le mouvement
         double newX = x + steering.getVelocityX();
         double newY = y + steering.getVelocityY();
 
-        appliquerMouvement(newX, newY);
+        appliquerMouvementAvecCollision(newX, newY);
 
-        if (waypointIndex == chemin.size() - 1 && distance < 5) {
-            arrived = true;
+        // Détection de blocage
+        double deplacement = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+        if (deplacement < 0.3) {
+            stuckCounter++;
+        } else {
+            stuckCounter = 0;
+        }
+
+        if (stuckCounter >= STUCK_THRESHOLD && waypointIndex < chemin.size() - 1) {
+            waypointIndex++;
+            stuckCounter = 0;
+            steering.reset();
         }
     }
 
@@ -369,7 +324,8 @@ public class Monstre {
         return Math.sqrt(Math.pow(target.getX() - x, 2) + Math.pow(target.getY() - y, 2));
     }
 
-    private void appliquerMouvement(double newX, double newY) {
+
+    private void appliquerMouvementAvecCollision(double newX, double newY) {
         if (map == null) {
             x = newX;
             y = newY;
@@ -380,27 +336,24 @@ public class Monstre {
             x = newX;
             y = newY;
         } else {
-            gererCollision(newX, newY);
+            boolean movedX = false;
+            boolean movedY = false;
+
+            if (!collidesWithWall(newX, y)) {
+                x = newX;
+                movedX = true;
+            }
+            if (!collidesWithWall(movedX ? newX : x, newY)) {
+                y = newY;
+                movedY = true;
+            }
+
+            if (!movedX) steering.killVelocityX();
+            if (!movedY) steering.killVelocityY();
+            if (!movedX && !movedY) steering.reset();
         }
     }
 
-    private void gererCollision(double newX, double newY) {
-        if (!collidesWithWall(newX, y)) {
-            x = newX;
-            steering.killVelocityY();
-            return;
-        }
-
-        if (!collidesWithWall(x, newY)) {
-            y = newY;
-            steering.killVelocityX();
-            return;
-        }
-
-        steering.reset();
-    }
-
-    // ==================== GESTION DU CHEMIN ====================
 
     /**
      * Définit le chemin à suivre depuis le noeud final RRT*
@@ -455,7 +408,6 @@ public class Monstre {
         steering.reset();
     }
 
-    // ==================== COLLISION & SÉPARATION ====================
 
     private void applyWallSeparation() {
         double separationX = 0;
@@ -498,50 +450,100 @@ public class Monstre {
         return map.estDansMur((int) posX, (int) posY);
     }
 
-    // ==================== GETTERS ====================
 
-    public double getX() { return x; }
-    public double getY() { return y; }
-    public double getRotation() { return steering.getRotation(); }
-    public double getSpeed() { return steering.getSpeed(); }
-    public boolean isArrived() { return arrived; }
-    public List<Noeud> getChemin() { return chemin; }
-    public int getWaypointIndex() { return waypointIndex; }
-    public Etat getEtatActuel() { return etatActuel; }
-    public SteeringBehavior getSteering() { return steering; }
-
-    public Noeud getCurrentWaypoint() {
-        if (chemin.isEmpty() || waypointIndex >= chemin.size()) {
-            return null;
-        }
-        return chemin.get(waypointIndex);
+    public double getX() {
+        return x;
     }
 
-    // ==================== SETTERS ====================
+    public double getY() {
+        return y;
+    }
 
-    public void setWaypointTolerance(double tolerance) {
-        this.waypointTolerance = tolerance;
+    public double getRotation() {
+        return steering.getRotation();
+    }
+
+    public boolean isArrived() {
+        return arrived;
+    }
+
+    public List<Noeud> getChemin() {
+        return chemin;
     }
 
     public void setMap(Map map) {
         this.map = map;
     }
 
+
+    /**
+     * Définit la cible (joueur) que le monstre doit poursuivre.
+     *
+     * @param target La cible à suivre
+     */
+    public void setTarget(Target target) {
+        this.target = target;
+    }
+
+    /**
+     * Retourne la cible actuelle du monstre.
+     *
+     * @return La cible ou null si aucune
+     */
+    public Target getTarget() {
+        return this.target;
+    }
+
+    /**
+     * Définit la distance de détection du monstre.
+     *
+     * @param distance Distance en pixels
+     */
+    public void setDistanceDetection(double distance) {
+        this.distanceDetection = distance;
+    }
+
+    /**
+     * Retourne la distance de détection du monstre.
+     *
+     * @return Distance en pixels
+     */
+    public double getDistanceDetection() {
+        return this.distanceDetection;
+    }
+
+    /**
+     * Définit les points de patrouille du monstre.
+     *
+     * @param pointA Premier point de patrouille
+     * @param pointB Second point de patrouille
+     */
     public void setPointsPatrouille(Noeud pointA, Noeud pointB) {
         this.pointA = pointA;
         this.pointB = pointB;
     }
 
-    public void setCible(Noeud cible) {
-        this.cible = cible;
+    /**
+     * Démarre la patrouille du monstre.
+     * Le monstre commencera à patrouiller entre pointA et pointB.
+     */
+    public void demarrerPatrouille() {
+        if (pointA == null || pointB == null) {
+            System.out.println("[Monstre] Erreur: Points de patrouille non définis!");
+            return;
+        }
+        // Initialiser la destination vers le point A
+        destinationActuelle = pointA;
+        System.out.println("[Monstre] Démarrage de la patrouille entre " +
+                "(" + pointA.getX() + "," + pointA.getY() + ") et (" + pointB.getX() + "," + pointB.getY() + ")");
+        transitionVers(Etat.PATROUILLE);
     }
 
-    public void setDistanceDetection(double distance) {
-        this.distanceDetection = distance;
-    }
-
-    public void setDelaiAttente(long delai) {
-        this.delaiAttente = delai;
+    /**
+     * Retourne l'état actuel de l'automate.
+     */
+    public Etat getEtat() {
+        return etatActuel;
     }
 }
 

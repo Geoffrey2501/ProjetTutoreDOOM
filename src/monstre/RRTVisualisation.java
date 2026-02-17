@@ -1,5 +1,7 @@
 package monstre;
 
+import entite.Joueur;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.Ellipse2D;
@@ -12,6 +14,14 @@ public class RRTVisualisation extends JPanel {
     private List<Noeud> noeuds;
     private List<Noeud> chemin;
     private Monstre monstre;
+
+    // Joueurs à afficher
+    private Joueur joueur1;
+    private Joueur joueur2;
+
+    // Points de patrouille à afficher
+    private Noeud pointPatrouilleA;
+    private Noeud pointPatrouilleB;
 
     // Marqueur de la cible (clic souris)
     private int cibleX = -1, cibleY = -1;
@@ -69,6 +79,14 @@ public class RRTVisualisation extends JPanel {
         this.afficherCible = false;
     }
 
+    /**
+     * Met à jour le chemin à afficher.
+     */
+    public void updateChemin(java.util.List<Noeud> nouveauChemin) {
+        this.chemin = nouveauChemin;
+        // Pas besoin d'invalider le cache car le chemin est dessiné dynamiquement
+    }
+
     // Méthode appelée par le contrôleur pour mettre à jour l'affichage
     public void render() {
         this.repaint();
@@ -82,9 +100,29 @@ public class RRTVisualisation extends JPanel {
         // 1. Dessiner le fond (Murs + Arbre RRT) - Utilise le cache
         drawStaticBackground(g2d);
 
-        // 2. Dessiner le monstre (Dynamique)
+        // 2. Dessiner le chemin actuel (Dynamique - en rouge)
+        drawChemin(g2d);
+
+        // 3. Dessiner les joueurs (Dynamique)
+        drawJoueurs(g2d);
+
+        // 4. Dessiner le monstre (Dynamique)
         if (monstre != null) {
             drawMonstre(g2d);
+        }
+    }
+
+    /**
+     * Dessine le chemin actuel du monstre.
+     */
+    private void drawChemin(Graphics2D g2d) {
+        if (chemin != null && !chemin.isEmpty()) {
+            g2d.setColor(Color.RED);
+            g2d.setStroke(new BasicStroke(3));
+            for (int i = 0; i < chemin.size() - 1; i++) {
+                g2d.drawLine(chemin.get(i).getX(), chemin.get(i).getY(),
+                        chemin.get(i + 1).getX(), chemin.get(i + 1).getY());
+            }
         }
     }
 
@@ -135,15 +173,6 @@ public class RRTVisualisation extends JPanel {
             }
         }
 
-        // Chemin optimal (Rouge)
-        if (!chemin.isEmpty()) {
-            g.setColor(Color.RED);
-            g.setStroke(new BasicStroke(2));
-            for (int i = 0; i < chemin.size() - 1; i++) {
-                g.drawLine(chemin.get(i).getX(), chemin.get(i).getY(),
-                        chemin.get(i + 1).getX(), chemin.get(i + 1).getY());
-            }
-        }
 
         // Marqueur de cible (croix verte)
         if (afficherCible && cibleX >= 0 && cibleY >= 0) {
@@ -164,8 +193,33 @@ public class RRTVisualisation extends JPanel {
         double mx = monstre.getX();
         double my = monstre.getY();
 
-        // Corps
-        g2d.setColor(new Color(128, 0, 128));
+        // Rayon de détection (cercle semi-transparent)
+        double rayonDetection = monstre.getDistanceDetection();
+        if (rayonDetection > 0) {
+            g2d.setColor(new Color(255, 200, 0, 30));  // Jaune transparent
+            g2d.fill(new Ellipse2D.Double(mx - rayonDetection, my - rayonDetection,
+                                          rayonDetection * 2, rayonDetection * 2));
+            g2d.setColor(new Color(255, 200, 0, 100));
+            g2d.setStroke(new BasicStroke(1));
+            g2d.draw(new Ellipse2D.Double(mx - rayonDetection, my - rayonDetection,
+                                          rayonDetection * 2, rayonDetection * 2));
+        }
+
+        // Corps (couleur selon l'état)
+        Monstre.Etat etat = monstre.getEtat();
+        switch (etat) {
+            case ATTENTE:
+                g2d.setColor(new Color(100, 100, 100));  // Gris
+                break;
+            case PATROUILLE:
+                g2d.setColor(new Color(0, 128, 255));    // Bleu
+                break;
+            case POURSUITE:
+                g2d.setColor(new Color(255, 0, 0));      // Rouge
+                break;
+            default:
+                g2d.setColor(new Color(128, 0, 128));    // Violet
+        }
         g2d.fill(new Ellipse2D.Double(mx - 10, my - 10, 20, 20));
 
         // Direction
@@ -173,6 +227,98 @@ public class RRTVisualisation extends JPanel {
         g2d.setStroke(new BasicStroke(2));
         double rot = monstre.getRotation();
         g2d.drawLine((int)mx, (int)my, (int)(mx + Math.cos(rot)*15), (int)(my + Math.sin(rot)*15));
+
+        // Afficher l'état en texte
+        g2d.setColor(Color.BLACK);
+        g2d.setFont(new Font("Arial", Font.BOLD, 12));
+        g2d.drawString(etat.toString(), (int)mx - 30, (int)my - 15);
+    }
+
+    /**
+     * Définit les joueurs à afficher sur la visualisation.
+     */
+    public void setJoueurs(Joueur joueur1, Joueur joueur2) {
+        this.joueur1 = joueur1;
+        this.joueur2 = joueur2;
+    }
+
+    /**
+     * Définit un seul joueur à afficher.
+     */
+    public void setJoueur(Joueur joueur) {
+        this.joueur1 = joueur;
+        this.joueur2 = null;
+    }
+
+    /**
+     * Définit les points de patrouille à afficher.
+     */
+    public void setPointsPatrouille(Noeud pointA, Noeud pointB) {
+        this.pointPatrouilleA = pointA;
+        this.pointPatrouilleB = pointB;
+        this.backgroundCache = null; // Invalider le cache pour redessiner
+    }
+
+    /**
+     * Dessine les joueurs sur la visualisation.
+     */
+    private void drawJoueurs(Graphics2D g2d) {
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Points de patrouille (A = cyan, B = orange)
+        if (pointPatrouilleA != null) {
+            int x = pointPatrouilleA.getX();
+            int y = pointPatrouilleA.getY();
+            g2d.setColor(Color.CYAN);
+            g2d.fill(new Ellipse2D.Double(x - 10, y - 10, 20, 20));
+            g2d.setColor(Color.BLACK);
+            g2d.setStroke(new BasicStroke(2));
+            g2d.draw(new Ellipse2D.Double(x - 10, y - 10, 20, 20));
+            g2d.setFont(new Font("Arial", Font.BOLD, 12));
+            g2d.drawString("A", x - 4, y + 5);
+        }
+
+        if (pointPatrouilleB != null) {
+            int x = pointPatrouilleB.getX();
+            int y = pointPatrouilleB.getY();
+            g2d.setColor(Color.ORANGE);
+            g2d.fill(new Ellipse2D.Double(x - 10, y - 10, 20, 20));
+            g2d.setColor(Color.BLACK);
+            g2d.setStroke(new BasicStroke(2));
+            g2d.draw(new Ellipse2D.Double(x - 10, y - 10, 20, 20));
+            g2d.setFont(new Font("Arial", Font.BOLD, 12));
+            g2d.drawString("B", x - 4, y + 5);
+        }
+
+        // Joueur 1 (Rouge)
+        if (joueur1 != null) {
+            double x = joueur1.getX();
+            double y = joueur1.getY();
+            g2d.setColor(Color.RED);
+            g2d.fill(new Ellipse2D.Double(x - 8, y - 8, 16, 16));
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.BOLD, 10));
+            g2d.drawString("1", (int)x - 3, (int)y + 4);
+        }
+
+        // Joueur 2 (Bleu)
+        if (joueur2 != null) {
+            double x = joueur2.getX();
+            double y = joueur2.getY();
+            g2d.setColor(Color.BLUE);
+            g2d.fill(new Ellipse2D.Double(x - 8, y - 8, 16, 16));
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.BOLD, 10));
+            g2d.drawString("2", (int)x - 3, (int)y + 4);
+        }
+
+        // Afficher quelle cible est active (cercle autour)
+        if (monstre != null && monstre.getTarget() != null) {
+            Target target = monstre.getTarget();
+            g2d.setColor(Color.GREEN);
+            g2d.setStroke(new BasicStroke(2));
+            g2d.drawOval((int)target.getX() - 12, (int)target.getY() - 12, 24, 24);
+        }
     }
 
     // Utilitaire pour transformer la liste chaînée de parents en liste simple
