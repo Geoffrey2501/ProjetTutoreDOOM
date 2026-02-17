@@ -26,6 +26,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     // === Composants du jeu ===
     private final CollisionStrategy collision;
+
     private final Joueur joueur;
     private final Window window;
     private final Input input;
