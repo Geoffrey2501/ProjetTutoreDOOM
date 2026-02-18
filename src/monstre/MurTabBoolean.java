@@ -6,8 +6,6 @@ package monstre;
  * (x2, y2) = coin inférieur droit
  */
 public class MurTabBoolean extends Mur{
-    public int x1, y1, x2, y2;
-
     /**
      * Constructeur d'un mur rectangulaire.
      *
