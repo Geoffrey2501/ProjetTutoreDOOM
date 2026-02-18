@@ -1,16 +1,20 @@
 package moteur_graphique.BSP;
 
 import entite.Joueur;
+import entite.Sprite;
 import game.GameConfig;
 import moteur_graphique.GameRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class BSPParcours implements GameRenderer {
 
     private Joueur joueur;
     private ArbreBSP arbreBSP;
+
+    private final List<Sprite> sprites = new CopyOnWriteArrayList<>();
 
     public BSPParcours(Joueur joueur, MapMur map) {
         this.joueur = joueur;
@@ -19,31 +23,64 @@ public class BSPParcours implements GameRenderer {
     }
 
     public void render(java.awt.Graphics g, int width, int height) {
-        //on fait l'algo de parcours de l'arbre BSP pour dessiner les murs dans le bon ordre
-        //on fait l'arbre, on parcours, on obtiens la liste de 4 points pour chaque mur à dessiner, on gère les murs déjà remplis avec FilledScreen, et on s'arrete si l'écran est rempli
-        //on fini par appeler Renderer.renderFourPointsList(g, int width, int height, List<FourPoints> pointsList) pour dessiner les murs
-
         FrontToBack frontToBack = new FrontToBack(this.arbreBSP, joueur.getX(), joueur.getY());
         FilledScreen filledScreen = new FilledScreen(width);
         WallCalcul wallCalcul = new WallCalcul();
 
-        List<FourPoints> pointsToDraw  = new ArrayList<FourPoints>();
+        // On stocke des couples [Objet, MurOriginal] pour savoir où insérer les sprites
+        // Objet est soit un Sprite, soit un FourPoints
+        List<Object[]> orderedItems = new ArrayList<>();
 
+        // 1. On récupère les murs visibles en Front-to-Back
         Mur m = frontToBack.getNextWall();
         while(m != null && !filledScreen.isFull()) {
-
             FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), GameConfig.FOV, joueur.getAngle(), width, height);
             if(points != null) {
-                List<FourPoints> pointsAfterFilledScreen = filledScreen.add(points);
-                if (pointsAfterFilledScreen != null) {
-                    pointsToDraw.addAll(pointsAfterFilledScreen);
+                List<FourPoints> segments = filledScreen.add(points);
+                if (segments != null) {
+                    for (FourPoints seg : segments) {
+                        orderedItems.add(new Object[]{seg, m}); // On garde la réf au mur original
+                    }
                 }
             }
             m = frontToBack.getNextWall();
         }
 
+        // 2. On insère les sprites dynamiquement dans la liste
+        double jX = joueur.getX();
+        double jY = joueur.getY();
+
+        // On trie d'abord les sprites par distance (proche en premier pour l'insertion FTB)
+        List<Sprite> sortedSprites = new ArrayList<>(sprites);
+        sortedSprites.sort((a, b) -> Double.compare(
+                Math.pow(a.getX()-jX, 2) + Math.pow(a.getY()-jY, 2),
+                Math.pow(b.getX()-jX, 2) + Math.pow(b.getY()-jY, 2)
+        ));
+
+        for (Sprite s : sortedSprites) {
+            int insertIndex = orderedItems.size(); // Par défaut : au fond
+            for (int i = 0; i < orderedItems.size(); i++) {
+                Mur wallRef = (Mur) orderedItems.get(i)[1];
+                if (wallRef != null) {
+                    // Algorithme de localisation : le sprite est-il du même côté que le joueur ?
+                    double cpS = (wallRef.x1 - wallRef.x0) * (s.getY() - wallRef.y0) - (wallRef.y1 - wallRef.y0) * (s.getX() - wallRef.x0);
+                    double cpJ = (wallRef.x1 - wallRef.x0) * (jY - wallRef.y0) - (wallRef.y1 - wallRef.y0) * (jX - wallRef.x0);
+
+                    if ((cpS >= 0 && cpJ >= 0) || (cpS <= 0 && cpJ <= 0)) {
+                        insertIndex = i; // Le sprite est devant ce mur
+                        break;
+                    }
+                }
+            }
+            orderedItems.add(insertIndex, new Object[]{s, null});
+        }
+
+        //On inverse la liste
+        java.util.Collections.reverse(orderedItems);
+
+        //plus qu'a dessiner, le culling sera fait automatiquement par l'ordre Back-to-Front
         Renderer r = new Renderer();
-        r.renderFourPointsList(g, width, height, pointsToDraw);
+        r.renderWorld(g, width, height, orderedItems, joueur);
     }
 
     public List<Mur> getMursVisibles(double x, double y) {
@@ -94,4 +131,7 @@ public class BSPParcours implements GameRenderer {
 
         return mursVisibles;
     }
+
+    public void addSprite(Sprite sprite) { sprites.add(sprite); }
+    public void removeSprite(Sprite sprite) { sprites.remove(sprite); }
 }

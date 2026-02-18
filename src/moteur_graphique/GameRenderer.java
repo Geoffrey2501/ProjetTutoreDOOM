@@ -1,5 +1,7 @@
 package moteur_graphique;
 
+import entite.Sprite;
+
 import java.awt.Graphics;
 
 public interface GameRenderer {
@@ -10,4 +12,7 @@ public interface GameRenderer {
      * @param height Hauteur de la zone de dessin
      */
     void render(Graphics g, int width, int height);
+
+    void addSprite(Sprite sprite);
+    void removeSprite(Sprite sprite);
 }

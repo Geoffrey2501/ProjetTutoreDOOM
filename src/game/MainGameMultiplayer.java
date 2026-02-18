@@ -1,5 +1,6 @@
 package game;
 
+import entite.Sprite;
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -60,6 +61,14 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         MapMur mapMur = new MapMur("assets/maps/mapBSP.txt");
         GameRenderer r = new BSPParcours(joueur, mapMur);
         collision = new CollisionBSP(mapMur);
+        /* test sprite
+        Sprite testSprite = new Sprite(5.5, 5.5, "assets/sprites/jonesy.png");
+        r.addSprite(testSprite);
+
+        Sprite joueurTest = new Sprite(7, 7, "assets/sprites/jonesy.png", "test");
+        r.addSprite(joueurTest);
+        */
+
 
         window.setRenderer(r);
 
