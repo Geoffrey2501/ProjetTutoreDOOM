@@ -48,7 +48,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
      * @param serverPort port du serveur/pair à rejoindre
      */
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
-        window = new Window(1920, 1080);
+        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT);
 
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
@@ -61,13 +61,12 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         MapMur mapMur = new MapMur("assets/maps/mapBSP.txt");
         GameRenderer r = new BSPParcours(joueur, mapMur);
         collision = new CollisionBSP(mapMur);
-        /* test sprite
+        
         Sprite testSprite = new Sprite(5.5, 5.5, "assets/sprites/jonesy.png");
         r.addSprite(testSprite);
 
         Sprite joueurTest = new Sprite(7, 7, "assets/sprites/jonesy.png", "test");
         r.addSprite(joueurTest);
-        */
 
 
         window.setRenderer(r);

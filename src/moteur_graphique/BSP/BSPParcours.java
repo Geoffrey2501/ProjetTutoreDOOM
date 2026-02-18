@@ -14,6 +14,8 @@ public class BSPParcours implements GameRenderer {
     private Joueur joueur;
     private ArbreBSP arbreBSP;
 
+    private final Renderer renderer = new Renderer();
+
     private final List<Sprite> sprites = new CopyOnWriteArrayList<>();
 
     public BSPParcours(Joueur joueur, MapMur map) {
@@ -58,16 +60,18 @@ public class BSPParcours implements GameRenderer {
         ));
 
         for (Sprite s : sortedSprites) {
-            int insertIndex = orderedItems.size(); // Par défaut : au fond
+            int insertIndex = orderedItems.size();
             for (int i = 0; i < orderedItems.size(); i++) {
                 Mur wallRef = (Mur) orderedItems.get(i)[1];
                 if (wallRef != null) {
-                    // Algorithme de localisation : le sprite est-il du même côté que le joueur ?
-                    double cpS = (wallRef.x1 - wallRef.x0) * (s.getY() - wallRef.y0) - (wallRef.y1 - wallRef.y0) * (s.getX() - wallRef.x0);
-                    double cpJ = (wallRef.x1 - wallRef.x0) * (jY - wallRef.y0) - (wallRef.y1 - wallRef.y0) * (jX - wallRef.x0);
+                    int sideS = getSide(wallRef, s.getX(), s.getY());
+                    int sideJ = getSide(wallRef, jX, jY);
 
-                    if ((cpS >= 0 && cpJ >= 0) || (cpS <= 0 && cpJ <= 0)) {
-                        insertIndex = i; // Le sprite est devant ce mur
+                    // Un sprite est devant un mur si :
+                    // 1. Il est du même côté que le joueur
+                    // 2. Ou le joueur est sur la ligne (dans ce cas, le mur ne peut pas l'occlure)
+                    if (sideS == sideJ || sideJ == 0) {
+                        insertIndex = i;
                         break;
                     }
                 }
@@ -79,8 +83,15 @@ public class BSPParcours implements GameRenderer {
         java.util.Collections.reverse(orderedItems);
 
         //plus qu'a dessiner, le culling sera fait automatiquement par l'ordre Back-to-Front
-        Renderer r = new Renderer();
-        r.renderWorld(g, width, height, orderedItems, joueur);
+        renderer.renderWorld(g, width, height, orderedItems, joueur);
+    }
+
+    private int getSide(Mur wall, double px, double py) {
+        double epsilon = 1e-5;
+        double res = (wall.x1 - wall.x0) * (py - wall.y0) - (wall.y1 - wall.y0) * (px - wall.x0);
+        if (res > epsilon) return 1;
+        if (res < -epsilon) return -1;
+        return 0; // Sur la ligne
     }
 
     public List<Mur> getMursVisibles(double x, double y) {

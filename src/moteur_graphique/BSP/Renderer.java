@@ -70,7 +70,7 @@ public class Renderer {
         if (Math.abs(angleDiff) > fov) return;
 
         double dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 0.1) return;
+        if (dist < 0.1 || dist > 5000) return;
 
         int spriteSize = (int) (h / dist);
         int screenX = (int) ((0.5 + angleDiff / fov) * w);
