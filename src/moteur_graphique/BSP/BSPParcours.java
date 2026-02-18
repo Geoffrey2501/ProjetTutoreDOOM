@@ -60,19 +60,19 @@ public class BSPParcours implements GameRenderer {
         ));
 
         for (Sprite s : sortedSprites) {
-            int insertIndex = orderedItems.size();
+            int insertIndex = 0; // Par défaut, on le met au début (le plus proche)
+
             for (int i = 0; i < orderedItems.size(); i++) {
                 Mur wallRef = (Mur) orderedItems.get(i)[1];
                 if (wallRef != null) {
                     int sideS = getSide(wallRef, s.getX(), s.getY());
-                    int sideJ = getSide(wallRef, jX, jY);
+                    int sideJ = getSide(wallRef, joueur.getX(), joueur.getY());
 
-                    // Un sprite est devant un mur si :
-                    // 1. Il est du même côté que le joueur
-                    // 2. Ou le joueur est sur la ligne (dans ce cas, le mur ne peut pas l'occlure)
-                    if (sideS == sideJ || sideJ == 0) {
-                        insertIndex = i;
-                        break;
+                    // Si le sprite et le joueur sont de côtés OPPOSÉS,
+                    // le mur partitionne l'espace entre eux.
+                    // Le sprite est donc DERRIÈRE ce mur (en FTB).
+                    if (sideS != sideJ && sideS != 0 && sideJ != 0) {
+                        insertIndex = i + 1; // On décale le sprite derrière ce mur
                     }
                 }
             }
