@@ -81,7 +81,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         network.setNetworkListener(this);
         network.start();
 
-        spriteManager = new PlayerSpriteManager(raycasting, network);
+        spriteManager = new PlayerSpriteManager(r, network);
 
         gameLoop = new GameLoop(this);
 
