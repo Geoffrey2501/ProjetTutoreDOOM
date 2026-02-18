@@ -82,6 +82,7 @@ public class Monstre {
 
         Noeud cible = chemin.get(waypointIndex);
         double distToTarget = distance(cible);
+         repousserMur();
 
         // Changement de waypoint si on est assez proche
         if (distToTarget < 10 && waypointIndex < chemin.size() - 1) {
@@ -266,6 +267,34 @@ public class Monstre {
         if (target == null) return 0;
         double angle = Math.atan2(target.getY() - y, target.getX() - x);
         return Math.toDegrees(angle);
+    }
+
+    private void repousserMur() {
+        double separationX = 0;
+        double separationY = 0;
+        double probeDistance = RAYON + 4; // Sonder un peu plus loin que la hitbox
+        int numProbes = 8;
+
+        for (int i = 0; i < numProbes; i++) {
+            double angle = 2 * Math.PI * i / numProbes;
+            int probeX = (int) (x + probeDistance * Math.cos(angle));
+            int probeY = (int) (y + probeDistance * Math.sin(angle));
+
+            if (map.estDansMur(probeX, probeY)) {
+                // Pousser dans la direction opposée au mur
+                separationX -= Math.cos(angle);
+                separationY -= Math.sin(angle);
+            }
+        }
+
+        // Normaliser et appliquer la force de séparation
+        double mag = Math.sqrt(separationX * separationX + separationY * separationY);
+        if (mag > 0) {
+            double separationForce = 0.5; // Force de répulsion assez forte
+            separationX = (separationX / mag) * separationForce;
+            separationY = (separationY / mag) * separationForce;
+            steering.applySeparation(separationX, separationY);
+        }
     }
 
 }
