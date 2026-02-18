@@ -41,7 +41,7 @@ public class SimulateurMonstre implements Runnable {
             start = System.nanoTime();
 
             // 1. Mise à jour de la logique seulement si le monstre a un chemin
-            if (monstre.aChemin()) {
+            if (!monstre.getChemin().isEmpty()) {
                 update();
             }
 
@@ -52,7 +52,7 @@ public class SimulateurMonstre implements Runnable {
             Toolkit.getDefaultToolkit().sync();
 
             // 3. Gestion du temps : 60 FPS actif, ~10 FPS en idle
-            if (monstre.isArrived() || !monstre.aChemin()) {
+            if (monstre.isArrived() || monstre.getChemin().isEmpty()) {
                 // Idle : économiser le CPU quand le monstre ne bouge pas
                 try {
                     Thread.sleep(100);

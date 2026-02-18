@@ -78,10 +78,9 @@ public class MainChasse {
             }
 
             // Le monstre suit son chemin (avec Steering Behavior intégré)
-            if (monstre.aChemin()) {
+            if (!monstre.getChemin().isEmpty()) {
                 monstre.update();
             } else {
-                monstre.seekDirect(joueur.getX(), joueur.getY());
             }
 
             // Collision monstre-joueur
@@ -112,15 +111,7 @@ public class MainChasse {
                 Noeud chemin = rrt.trouverChemin(startX, startY, endX, endY);
 
                 // Mettre à jour sur l'EDT pour la thread-safety Swing
-                SwingUtilities.invokeLater(() -> {
-                    if (chemin != null) {
-                        monstre.setChemin(chemin);
-                        vue.updateRRT(rrt.getNoeuds(), chemin);
-                    } else {
-                        vue.clearRRT();
-                    }
-                    calculEnCours = false;
-                });
+
             }, "RRT-Calculator");
             rrtThread.setDaemon(true);
             rrtThread.start();

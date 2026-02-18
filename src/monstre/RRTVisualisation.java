@@ -9,6 +9,8 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
+import static monstre.Automate.Etat.*;
+
 public class RRTVisualisation extends JPanel {
     private final Map map;
     private List<Noeud> noeuds;
@@ -206,7 +208,7 @@ public class RRTVisualisation extends JPanel {
         }
 
         // Corps (couleur selon l'état)
-        Monstre.Etat etat = monstre.getEtat();
+        Automate.Etat etat = monstre.getEtat();
         switch (etat) {
             case ATTENTE:
                 g2d.setColor(new Color(100, 100, 100));  // Gris

@@ -7,7 +7,7 @@ import java.awt.event.*;
 
 public class MainRRT {
 
-    public static void main(String[] args) {
+    static void main() {
         // 1. Initialisation des données
         Map map = new Map(600, 600);
         Monstre monstre = new Monstre(30, 30, map);
@@ -18,12 +18,12 @@ public class MainRRT {
 
         // Configurer le monstre
         monstre.setTarget(target);              // Le joueur à détecter
-        monstre.setDistanceDetection(150);       // Distance de détection (rayon de vision)
-
         // Définir les points de patrouille
         Noeud pointA = new Noeud(50, 50);
         Noeud pointB = new Noeud(550, 50);
         monstre.setPointsPatrouille(pointA, pointB);
+
+        RRT rrt = new RRT(map);
 
         SwingUtilities.invokeLater(() -> {
             // 2. Création de la fenêtre
@@ -38,17 +38,7 @@ public class MainRRT {
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
 
-            // 3. Calculer le premier chemin de patrouille
-            RRT rrt = new RRT(map);
-            Noeud cheminFinal = rrt.trouverChemin((int) monstre.getX(), (int) monstre.getY(),
-                                                   pointA.getX(), pointA.getY());
-            if (cheminFinal != null) {
-                monstre.setChemin(cheminFinal);
-                visualisation.updateRRT(rrt.getNoeuds(), cheminFinal);
-            }
 
-            // 4. Démarrer la patrouille
-            monstre.demarrerPatrouille();
 
             // 5. Boucle de jeu (60 FPS)
             Timer gameLoop = new Timer(16, e -> {
@@ -85,4 +75,3 @@ public class MainRRT {
         });
     }
 }
-

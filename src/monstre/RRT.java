@@ -11,16 +11,16 @@ public class RRT {
     private static final int RAYON_RECHERCHE = 80;  // Rayon pour rewiring RRT*
     private static int rayonMonstre = Monstre.RAYON;  // Rayon du monstre pour les collisions
 
-    private static ArrayList<Noeud> noeuds;
+    private static ArrayList<Noeud> noeuds = new ArrayList<>();
     private static Noeud debut;
     private static Noeud fin;
 
     public RRT(Map map) {
         this.map = map;
-        this.noeuds = new ArrayList<>();
     }
 
     public static Noeud trouverChemin(int startX, int startY, int endX, int endY) {
+        noeuds.clear();
         // Ne pas effacer l'arbre existant - on l'étend
         debut = new Noeud(startX, startY);
         debut.setCout(0);
