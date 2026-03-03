@@ -54,7 +54,7 @@ public class BSPParcours implements GameRenderer {
 
         // On trie d'abord les sprites par distance (proche en premier pour l'insertion FTB)
         List<Sprite> sortedSprites = new ArrayList<>(sprites);
-        sortedSprites.sort((a, b) -> Double.compare(
+        sortedSprites.sort((b, a) -> Double.compare(
                 Math.pow(a.getX()-jX, 2) + Math.pow(a.getY()-jY, 2),
                 Math.pow(b.getX()-jX, 2) + Math.pow(b.getY()-jY, 2)
         ));
