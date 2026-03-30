@@ -51,10 +51,18 @@ ProjetTutoreDOOM/
 
 ### Via le Makefile (recommandé)
 
+| Commande | Description |
+|---|---|
+| `make` | Compile toutes les sources dans `bin/` |
+| `make run` | Compile et lance le jeu multijoueur |
+| `make run-rrt` | Compile et lance la démo RRT (navigation monstres) |
+| `make run-rrt-prog` | Compile et lance la démo RRT progressive |
+| `make clean` | Supprime le dossier `bin/` (fichiers compilés) |
+| `make help` | Affiche la liste des commandes disponibles |
+
+Exemple rapide :
 ```bash
-make        # Compile toutes les sources
-make run    # Compile et lance le jeu
-make clean  # Supprime les fichiers compilés
+make run    # Compile puis lance le jeu
 ```
 
 ### Via le Terminal (manuellement)
@@ -90,9 +98,10 @@ java -cp bin monstre.MainRRT
 
 Lors du lancement, l'application vous guidera dans la console. Voici la séquence type pour démarrer une partie :
 
-1. **Identification** : Entrez votre pseudo.
-2. **Configuration Réseau** : Entrez un port local (ex: `5001`).
-3. **Mode de Connexion** : On vous demande si vous voulez rejoindre un joueur existant.
+1. **Mode de rendu** : Choisissez entre **BSP** (Binary Space Partitioning) ou **Raycasting**.
+2. **Identification** : Entrez votre pseudo.
+3. **Configuration Réseau** : Entrez un port local (ex: `5001`).
+4. **Mode de Connexion** : On vous demande si vous voulez rejoindre un joueur existant.
    - **Pour être Hôte (Premier joueur)** : Répondez `n` (non).
    - **Pour Rejoindre (Deuxième joueur)** : Répondez `o` (oui), puis entrez l'adresse IP et le port de l'hôte.
 
@@ -100,6 +109,12 @@ Lors du lancement, l'application vous guidera dans la console. Voici la séquenc
 
 ```text
 === DOOM-LIKE MULTIJOUEUR P2P ===
+
+Mode de rendu:
+  1. BSP (Binary Space Partitioning)
+  2. Raycasting
+Votre choix (1/2): 1
+Mode sélectionné: BSP
 
 Votre IP locale: 192.168.1.15
 (utilisez cette adresse pour que d'autres se connectent à vous)
