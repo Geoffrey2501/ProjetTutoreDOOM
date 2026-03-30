@@ -1,35 +1,69 @@
 # ProjetTutoreDOOM
 
-## 0. Informations Générales
+## Informations Générales
 - **Nom du projet** : ProjetTutoreDOOM
 - **Auteurs** : Cyprian, Ilyès, Marcelin, Geoffrey
 
-## 1. Installation
+## Installation
+
 Le projet est une application Java standard.
 
 ### Prérequis
-- **Java JDK** (version 25).
+- **Java JDK 25** ou supérieur.
+- **GNU Make** (optionnel, pour utiliser le Makefile).
 - Un IDE (IntelliJ IDEA, Eclipse, VS Code) ou un terminal.
 
 ### Procédure
-1. Récupérez le dossier du projet (via github).
+1. Clonez le dépôt :
 ```bash
 git clone https://github.com/Geoffrey2501/ProjetTutoreDOOM.git
+cd ProjetTutoreDOOM
 ```
 
-## 2. Bibliothèques Requises
-Aucune bibliothèque externe n'est nécessaire.
-Le projet utilise uniquement les bibliothèques standard de Java.
+## Bibliothèques Requises
 
-## 3. Lancement de l'Application
+Le projet utilise uniquement les bibliothèques standard de Java (AWT, Swing, `java.net`, etc.).
+Les tests unitaires nécessitent **JUnit 5** (fourni automatiquement par IntelliJ IDEA).
 
-### Via le Terminal (Ligne de commande)
+## Structure du Projet
+
+```
+ProjetTutoreDOOM/
+├── src/
+│   ├── game/                  # Boucle de jeu, multijoueur, entrées clavier/souris
+│   ├── moteur_graphique/      # Fenêtre, rendu, stratégies de collision
+│   │   ├── BSP/               # Arbre BSP, murs, rendu BSP
+│   │   └── raycasting/        # Raycasting, carte booléenne, collisions
+│   ├── entite/                # Joueur, sprites
+│   ├── Reseau/                # Serveur P2P, client, gestion des connexions
+│   └── monstre/               # Monstres, algorithme RRT, steering
+├── test/
+│   ├── entite/                # Tests sur la carte et les murs
+│   └── Reseau/                # Tests sur les connexions réseau
+├── assets/
+│   └── maps/                  # Fichiers de carte (map.txt, mapBSP.txt)
+├── Documentation/             # Documents d'itération, diagrammes PlantUML
+├── Makefile                   # Compilation et exécution via make
+└── README.md
+```
+
+## Lancement de l'Application
+
+### Via le Makefile (recommandé)
+
+```bash
+make        # Compile toutes les sources
+make run    # Compile et lance le jeu
+make clean  # Supprime les fichiers compilés
+```
+
+### Via le Terminal (manuellement)
+
 Placez-vous à la racine du projet, puis compilez et exécutez :
 
 **Compilation :**
-*(Créez un dossier `bin` à la racine du projet s'il n'existe pas)*
 ```bash
-mkdir bin
+mkdir -p bin
 javac -d bin -sourcepath src src/game/MainGameMultiplayer.java
 ```
 
@@ -38,9 +72,21 @@ javac -d bin -sourcepath src src/game/MainGameMultiplayer.java
 java -cp bin game.MainGameMultiplayer
 ```
 
+### Démo RRT (navigation des monstres)
+
+```bash
+make run-rrt
+```
+
+Ou manuellement :
+```bash
+javac -d bin -sourcepath src src/monstre/MainRRT.java
+java -cp bin monstre.MainRRT
+```
+
 ---
 
-## 4. Séquence de Lancement (Guide Pratique)
+## Séquence de Lancement (Guide Pratique)
 
 Lors du lancement, l'application vous guidera dans la console. Voici la séquence type pour démarrer une partie :
 
@@ -75,11 +121,21 @@ Les autres joueurs peuvent se connecter à votre IP:port
 
 ---
 
-## 5. Détails Techniques
+## Tests
+
+Les tests unitaires utilisent **JUnit 5** et se trouvent dans le dossier `test/`.
+
+Pour les exécuter, utilisez votre IDE (IntelliJ IDEA, Eclipse) qui intègre nativement JUnit 5 :
+clic droit sur le dossier `test/` > *Run Tests*.
+
+---
+
+## Détails Techniques
 
 Ce projet implémente plusieurs concepts avancés "from scratch" :
 
 - **Moteur Graphique (Raycasting)** : Rendu 3D simulé à partir d'une carte 2D, similaire à Wolfenstein 3D ou DOOM.
-- **Optimisation Spatial (BSP - Binary Space Partitioning)** : Utilisation d'un arbre BSP pour gérer l'affichage et les collisions des murs de manière performante.
+- **Optimisation Spatiale (BSP - Binary Space Partitioning)** : Utilisation d'un arbre BSP pour gérer l'affichage et les collisions des murs de manière performante.
 - **Réseau P2P (Peer-to-Peer)** : Architecture décentralisée (maillage complet) où chaque joueur envoie sa position et ses actions directement aux autres pairs, sans serveur central dédié.
-- **Intelligence Artificielle (RRT)** : Algorithme *Rapidly-exploring Random Tree* pour la navigation des monstres (démos disponibles dans `src/monstre/MainRRT.java`).
+- **Intelligence Artificielle (RRT)** : Algorithme *Rapidly-exploring Random Tree* pour la navigation des monstres (démos disponibles via `make run-rrt` ou `src/monstre/MainRRT.java`).
+- **Cartes** : Fichiers de niveau au format texte dans `assets/maps/`.
