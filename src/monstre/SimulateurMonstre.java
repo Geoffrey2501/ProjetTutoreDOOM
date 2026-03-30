@@ -40,8 +40,10 @@ public class SimulateurMonstre implements Runnable {
         while (running) {
             start = System.nanoTime();
 
-            // 1. Mise à jour de la logique (Physique)
-            update();
+            // 1. Mise à jour de la logique seulement si le monstre a un chemin
+            if (!monstre.getChemin().isEmpty()) {
+                update();
+            }
 
             // 2. Mise à jour de l'affichage (Rendu)
             vue.render();
@@ -49,22 +51,24 @@ public class SimulateurMonstre implements Runnable {
             // INDISPENSABLE sur Linux/Windows pour la fluidité (évite le tearing)
             Toolkit.getDefaultToolkit().sync();
 
-            // 3. Gestion du temps (Sleep) pour maintenir 60 FPS stables
-            elapsed = System.nanoTime() - start;
-            wait = TARGET_TIME - (elapsed / 1_000_000);
+            // 3. Gestion du temps : 60 FPS actif, ~10 FPS en idle
+            if (monstre.isArrived() || monstre.getChemin().isEmpty()) {
+                // Idle : économiser le CPU quand le monstre ne bouge pas
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                elapsed = System.nanoTime() - start;
+                wait = TARGET_TIME - (elapsed / 1_000_000);
+                if (wait < 5) wait = 5;
 
-            if (wait < 5) wait = 5; // Pause minimale pour laisser respirer le CPU
-
-            try {
-                Thread.sleep(wait);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            // Condition d'arrêt
-            if (monstre.isArrived()) {
-                System.out.println("Monstre arrivé à destination !");
-                running = false;
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
