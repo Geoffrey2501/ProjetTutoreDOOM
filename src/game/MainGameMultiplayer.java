@@ -1,6 +1,11 @@
 package game;
 
-import entite.Sprite;
+import entite.Joueur;
+import java.awt.*;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.*;
+import java.util.List;
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -10,13 +15,6 @@ import moteur_graphique.Window;
 import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
-import entite.Joueur;
-
-import java.awt.*;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.*;
-import java.util.List;
 
 /**
  * Classe principale du jeu multijoueur. Coordonne les différents composants :
@@ -91,6 +89,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
             network.connectToPlayer("Server", serverIp, serverPort);
+        }
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
