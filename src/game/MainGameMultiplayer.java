@@ -1,5 +1,6 @@
 package game;
 
+import entite.Sprite;
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -49,7 +50,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
      * @param useBSP true pour utiliser BSP, false pour Raycasting
      */
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort, boolean useBSP) {
-        window = new Window(1920, 1080);
+        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT);
 
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
@@ -84,7 +85,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         network.setNetworkListener(this);
         network.start();
 
-        spriteManager = new PlayerSpriteManager(raycasting, network);
+        spriteManager = new PlayerSpriteManager(renderer, network);
 
         gameLoop = new GameLoop(this);
 

@@ -2,6 +2,7 @@ package game;
 
 import entite.Joueur;
 import entite.Sprite;
+import moteur_graphique.GameRenderer;
 import moteur_graphique.raycasting.Raycasting;
 
 import java.util.Map;
@@ -14,12 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PlayerSpriteManager {
 
     private final Map<String, Sprite> playerSprites;
-    private final Raycasting raycasting;
+    private final GameRenderer renderer;
     private final GameNetworkAdapter network;
 
-    public PlayerSpriteManager(Raycasting raycasting, GameNetworkAdapter network) {
+    public PlayerSpriteManager(GameRenderer renderer, GameNetworkAdapter network) {
         this.playerSprites = new ConcurrentHashMap<>();
-        this.raycasting = raycasting;
+        this.renderer = renderer;
         this.network = network;
     }
 
@@ -59,7 +60,7 @@ public class PlayerSpriteManager {
                 if (remotePlayer != null && remotePlayer.isPositionInitialized()) {
                     Sprite playerSprite = new Sprite(x, y, GameConfig.PLAYER_SPRITE_PATH, playerId);
                     playerSprites.put(playerId, playerSprite);
-                    raycasting.addSprite(playerSprite);
+                    renderer.addSprite(playerSprite);
                 }
             }
         }
@@ -86,7 +87,7 @@ public class PlayerSpriteManager {
                         playerId
                 );
                 playerSprites.put(playerId, playerSprite);
-                raycasting.addSprite(playerSprite);
+                renderer.addSprite(playerSprite);
                 return true;
             }
         }
@@ -105,7 +106,7 @@ public class PlayerSpriteManager {
             sprite = playerSprites.remove(playerId);
         }
         if (sprite != null) {
-            raycasting.removeSprite(sprite);
+            renderer.removeSprite(sprite);
             return true;
         }
         return false;
