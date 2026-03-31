@@ -123,7 +123,7 @@ public class SimulationMultijoueur {
         String name = PLAYER_NAMES[index];
         int port = PLAYER_PORTS[index];
 
-        MainGameMultiplayer game = new MainGameMultiplayer(name, port, serverIp, serverPort);
+        MainGameMultiplayer game = new MainGameMultiplayer(name, port, serverIp, serverPort, true);
 
         return game;
     }

@@ -1,7 +1,9 @@
 package moteur_graphique.BSP;
 
 import entite.Joueur;
+
 import game.GameConfig;
+
 import moteur_graphique.GameRenderer;
 
 import java.util.ArrayList;
@@ -10,6 +12,9 @@ import java.util.List;
 public class BSPParcours implements GameRenderer {
 
     private Joueur joueur;
+  
+    private static final int FOV = 60;
+
     private ArbreBSP arbreBSP;
 
     public BSPParcours(Joueur joueur, MapMur map) {
@@ -31,8 +36,7 @@ public class BSPParcours implements GameRenderer {
 
         Mur m = frontToBack.getNextWall();
         while(m != null && !filledScreen.isFull()) {
-
-            FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), GameConfig.FOV, joueur.getAngle(), width, height);
+            FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), FOV, joueur.getAngle(), width, height);
             if(points != null) {
                 List<FourPoints> pointsAfterFilledScreen = filledScreen.add(points);
                 if (pointsAfterFilledScreen != null) {

@@ -18,15 +18,14 @@ import java.util.*;
 import java.util.List;
 
 /**
- * Classe principale du jeu multijoueur.
- * Coordonne les différents composants : rendu, réseau, entrées, joueur.
- * Implémente le pattern Façade pour simplifier l'utilisation du jeu.
+ * Classe principale du jeu multijoueur. Coordonne les différents composants :
+ * rendu, réseau, entrées, joueur. Implémente le pattern Façade pour simplifier
+ * l'utilisation du jeu.
  */
 public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     // === Composants du jeu ===
     private final CollisionStrategy collision;
-
     private final Joueur joueur;
     private final Window window;
     private final Input input;
@@ -41,27 +40,40 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     /**
      * Constructeur du jeu multijoueur.
+     *
      * @param playerId identifiant du joueur local
      * @param port port d'écoute pour les connexions entrantes
      * @param serverIp IP du serveur/pair à rejoindre (peut être null)
      * @param serverPort port du serveur/pair à rejoindre
+     * @param useBSP true pour utiliser BSP, false pour Raycasting
      */
-    public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort) {
+    public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort, boolean useBSP) {
         window = new Window(1920, 1080);
 
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
 
-         MapBool map = new MapBool("assets/maps/map.txt");
-         Raycasting raycasting = new Raycasting(map, joueur);
-//         GameRenderer r = raycasting;
-//         collision = new CollisionRaycasting(map);
 
-        MapMur mapMur = new MapMur("assets/maps/mapBSP.txt");
-        GameRenderer r = new BSPParcours(joueur, mapMur);
-        collision = new CollisionBSP(mapMur);
+        GameRenderer renderer;
+        Raycasting raycasting;
 
-        window.setRenderer(r);
+        if (useBSP) {
+            // Mode BSP
+            MapMur mapMur = new MapMur("assets/maps/mapBSP.txt");
+            renderer = new BSPParcours(joueur, mapMur);
+            collision = new CollisionBSP(mapMur);
+            // On crée quand même le raycasting pour le sprite manager
+            MapBool map = new MapBool("assets/maps/map.txt");
+            raycasting = new Raycasting(map, joueur);
+        } else {
+            // Mode Raycasting
+            MapBool map = new MapBool("assets/maps/map.txt");
+            raycasting = new Raycasting(map, joueur);
+            renderer = raycasting;
+            collision = new CollisionRaycasting(map);
+        }
+
+        window.setRenderer(renderer);
 
         window.addInputListener(input);
 
@@ -76,7 +88,8 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         gameLoop = new GameLoop(this);
 
-        if (serverIp != null && !serverIp.isEmpty() && serverPort > 0)
+
+        if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
             network.connectToPlayer("Server", serverIp, serverPort);
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
@@ -105,7 +118,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
             moved = true;
         }
 
-        if (moved) network.sendPlayerPosition();
+        if (moved) {
+            network.sendPlayerPosition();
+        }
+
 
         updateScoreboard();
 
@@ -173,6 +189,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         window.setFPS(fps);
     }
 
+
     private boolean applyMovement(double dx, double dy) {
         boolean moved = false;
         double currentX = joueur.getX();
@@ -182,13 +199,13 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         double playerRadius = 0.3;
 
-        if(!collision.isColliding(nextX, currentY, playerRadius)) {
+        if (!collision.isColliding(nextX, currentY, playerRadius)) {
             joueur.setX(nextX);
             currentX = nextX;
             moved = true;
         }
 
-        if(!collision.isColliding(currentX, nextY, playerRadius)) {
+        if (!collision.isColliding(currentX, nextY, playerRadius)) {
             joueur.setY(nextY);
             moved = true;
         }
@@ -237,6 +254,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     /**
      * Récupère l'adresse IP locale de la machine.
+     *
      * @return l'adresse IP locale ou "localhost" si non trouvée
      */
     private static String getLocalIPAddress() {
@@ -244,7 +262,9 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
                 NetworkInterface iface = interfaces.nextElement();
-                if (iface.isLoopback() || !iface.isUp()) continue;
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
 
                 Enumeration<InetAddress> addresses = iface.getInetAddresses();
                 while (addresses.hasMoreElements()) {
@@ -268,13 +288,24 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         System.out.println("=== DOOM-LIKE MULTIJOUEUR P2P ===\n");
 
+        // Choix du mode de rendu
+        System.out.println("Mode de rendu:");
+        System.out.println("  1. BSP (Binary Space Partitioning)");
+        System.out.println("  2. Raycasting");
+        System.out.print("Votre choix (1/2): ");
+        String renderChoice = scanner.nextLine().trim();
+        boolean useBSP = !renderChoice.equals("2");
+        System.out.println("Mode sélectionné: " + (useBSP ? "BSP" : "Raycasting") + "\n");
+
         String localIP = getLocalIPAddress();
         System.out.println("Votre IP locale: " + localIP);
         System.out.println("(utilisez cette adresse pour que d'autres se connectent à vous)\n");
 
         System.out.print("Votre nom de joueur: ");
         String playerId = scanner.nextLine().trim();
-        if (playerId.isEmpty()) playerId = "Player" + System.currentTimeMillis() % 1000;
+        if (playerId.isEmpty()) {
+            playerId = "Player" + System.currentTimeMillis() % 1000;
+        }
 
         System.out.print("Votre port (ex: 5001): ");
         int port = Integer.parseInt(scanner.nextLine().trim());
@@ -295,11 +326,11 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
             System.out.print("Port du pair: ");
             int peerPort = Integer.parseInt(scanner.nextLine().trim());
 
-            game = new MainGameMultiplayer(playerId, port, peerIp, peerPort);
+            game = new MainGameMultiplayer(playerId, port, peerIp, peerPort, useBSP);
             System.out.println("\nConnexion au pair " + peerIp + ":" + peerPort);
             System.out.println("Le maillage P2P va se former automatiquement...");
         } else {
-            game = new MainGameMultiplayer(playerId, port, null, 0);
+            game = new MainGameMultiplayer(playerId, port, null, 0, useBSP);
             System.out.println("\nEn attente de connexions sur le port " + port);
             System.out.println("Les autres joueurs peuvent se connecter à votre IP:port");
         }
