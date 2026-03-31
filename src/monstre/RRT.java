@@ -3,35 +3,33 @@ package monstre;
 import java.util.ArrayList;
 
 public class RRT {
-    private Map map;
+    private static Map map;
 
-    private int MAX_ITERATIONS = 2000;
+    private static int MAX_ITERATIONS = 2000;
 
     private static final int DEFAULT_MAX_DISTANCE_POINT = 50;
     private static final int RAYON_RECHERCHE = 80;  // Rayon pour rewiring RRT*
-    private int rayonMonstre = Monstre.RAYON;  // Rayon du monstre pour les collisions
+    private static int rayonMonstre = Monstre.RAYON;  // Rayon du monstre pour les collisions
 
-    private ArrayList<Noeud> noeuds;
-    private Noeud debut;
-    private Noeud fin;
+    private static ArrayList<Noeud> noeuds = new ArrayList<>();
+    private static Noeud debut;
+    private static Noeud fin;
 
     public RRT(Map map) {
         this.map = map;
-        this.noeuds = new ArrayList<>();
     }
 
-    public RRT(Map map, int rayonMonstre) {
-        this.map = map;
-        this.noeuds = new ArrayList<>();
-        this.rayonMonstre = rayonMonstre;
-    }
-
-    public Noeud trouverChemin(int startX, int startY, int endX, int endY) {
+    public static Noeud trouverChemin(int startX, int startY, int endX, int endY) {
         noeuds.clear();
+        // Ne pas effacer l'arbre existant - on l'étend
         debut = new Noeud(startX, startY);
-        debut.setCout(0);  // Le départ a un coût de 0
+        debut.setCout(0);
         fin = new Noeud(endX, endY);
-        noeuds.add(debut);
+
+        // Ajouter le debut seulement si l'arbre est vide
+        if (noeuds.isEmpty()) {
+            noeuds.add(debut);
+        }
 
         Noeud meilleurVersLaFin = null;
 
@@ -89,7 +87,7 @@ public class RRT {
         return fin.getParent() != null ? fin : null;
     }
 
-    private Noeud trouverPlusProche(int x, int y) {
+    private static Noeud trouverPlusProche(int x, int y) {
         Noeud plusProche = null;
         double distanceMin = Double.MAX_VALUE;
         for (Noeud n : noeuds) {
@@ -102,7 +100,7 @@ public class RRT {
         return plusProche;
     }
 
-    private Noeud creerNoeudVers(Noeud depuis, int versX, int versY) {
+    private static Noeud creerNoeudVers(Noeud depuis, int versX, int versY) {
         double dx = versX - depuis.getX();
         double dy = versY - depuis.getY();
         double distance = Math.sqrt(dx * dx + dy * dy);
@@ -133,7 +131,7 @@ public class RRT {
 
 
     // RRT* : Trouver le meilleur parent parmi les voisins
-    private Noeud trouverMeilleurParent(Noeud nouveau) {
+    private static Noeud trouverMeilleurParent(Noeud nouveau) {
         Noeud meilleurParent = null;
         double meilleurCout = Double.MAX_VALUE;
 
@@ -154,7 +152,7 @@ public class RRT {
     }
 
     // RRT* : Rewiring - réoptimiser les connexions des voisins
-    private void optimiserConnexionNoeuds(Noeud nouveau) {
+    private static void optimiserConnexionNoeuds(Noeud nouveau) {
         for (Noeud n : noeuds) {
             if (n != nouveau && n != debut) {
                 double distance = calculerDistance(nouveau, n);
@@ -173,7 +171,7 @@ public class RRT {
         }
     }
 
-    private int[] getCoordonneesAleatoires(int endX, int endY) {
+    private static int[] getCoordonneesAleatoires(int endX, int endY) {
         int randX, randY;
         if (Math.random() < 0.1) {  // 10% de chance d'aller vers la fin
             randX = endX;
@@ -199,7 +197,7 @@ public class RRT {
         return fin;
     }
 
-    private double calculerDistance(Noeud courant, Noeud n) {
+    private static double calculerDistance(Noeud courant, Noeud n) {
         int[] coordCourant = courant.getCoordonnees();
         int[] coordN = n.getCoordonnees();
         return Math.sqrt(Math.pow(coordCourant[0] - coordN[0], 2) + Math.pow(coordCourant[1] - coordN[1], 2));

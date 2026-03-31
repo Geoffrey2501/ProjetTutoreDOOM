@@ -3,171 +3,298 @@ package monstre;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Classe représentant un monstre qui utilise RRT* pour le pathfinding
- * et Steering Behavior pour des mouvements naturels.
- */
 public class Monstre {
-    public static final int RAYON = 5;  // Rayon du monstre pour les collisions
-    private double x;
-    private double y;
-    private final SteeringBehavior steering;
-    private final List<Noeud> chemin;
-    private int waypointIndex = 0;
-    private double waypointTolerance = 15.0;
-    private boolean arrived = false;
-    private Map map;  // Référence à la map pour vérifier les collisions
 
-    public Monstre(double x, double y) {
-        this.x = x;
-        this.y = y;
-        this.steering = new SteeringBehavior();
-        this.chemin = new ArrayList<>();
-    }
+    public static final int RAYON = 5;
+
+    private double x, y;
+    private final SteeringBehavior steering;
+    private final Map map;
+
+    private List<Noeud> chemin = new ArrayList<>();
+    private int waypointIndex = 0;
+    private boolean arrived = false;
+
+    private Noeud pointA;
+    private Noeud pointB;
+    private Noeud destination;
+
+    private Target target;
+    private double distanceDetection = 150;
+
+    private final Automate automate;
+
+    private long dernierRecalcul = 0;
+    private double lastTargetX = -1;
+    private double lastTargetY = -1;
+    private final double SEUIL_MOUVEMENT = 10.0; // Distance minimum pour justifier un recalcul
+
+    // ===================== CONSTRUCTEUR =====================
 
     public Monstre(double x, double y, Map map) {
-        this(x, y);
+        this.x = x;
+        this.y = y;
         this.map = map;
+        this.steering = new SteeringBehavior();
+        this.automate = new Automate(this);
+
     }
 
-    /**
-     * Définit le chemin à suivre depuis le noeud final RRT*
-     * @param noeudFinal Le noeud d'arrivée avec les parents liés
-     */
-    public void setChemin(Noeud noeudFinal) {
-        chemin.clear();
-        waypointIndex = 0;
-        arrived = false;
-        steering.reset();
+    // ===================== UPDATE =====================
 
-        if (noeudFinal == null) return;
-
-        // Reconstruire le chemin depuis la fin vers le début
-        Noeud current = noeudFinal;
-        while (current != null) {
-            chemin.add(0, current);
-            current = current.getParent();
-        }
-    }
-
-    /**
-     * Met à jour la position du monstre avec Steering Behavior
-     */
     public void update() {
+        automate.update();
+    }
+
+    // ===================== AUTOMATE HELPERS =====================
+
+    public boolean cibleDetectee() {
+        if (target == null || !target.isVisible()) return false;
+        return target.distanceFrom(x, y) <= distanceDetection;
+    }
+
+    public void resetSteering() {
+        steering.reset();
+    }
+
+    public boolean isArrived() {
+        return arrived;
+    }
+    public void reprendrePatrouille() {
+
+        if (pointA == null || pointB == null) return;
+
+        double distA = distance(pointA);
+        double distB = distance(pointB);
+
+        destination = (distA < distB) ? pointA : pointB;
+
+        recalculerChemin();
+    }
+
+    // ===================== MOUVEMENT =====================
+
+    public void updateMouvement() {
         if (chemin.isEmpty() || waypointIndex >= chemin.size()) {
             arrived = true;
             return;
         }
 
-        Noeud target = chemin.get(waypointIndex);
-        double distance = Math.sqrt(Math.pow(target.getX() - x, 2) + Math.pow(target.getY() - y, 2));
+        Noeud cible = chemin.get(waypointIndex);
+        double distToTarget = distance(cible);
+         repousserMur();
 
-        // Passer au waypoint suivant si assez proche
-        if (distance < waypointTolerance && waypointIndex < chemin.size() - 1) {
+        // Changement de waypoint si on est assez proche
+        if (distToTarget < 10 && waypointIndex < chemin.size() - 1) {
             waypointIndex++;
-            target = chemin.get(waypointIndex);
+            return;
         }
 
-        // Utiliser seek pour tous les waypoints
-        steering.seek(x, y, target.getX(), target.getY());
-
-        // Calculer la nouvelle position
-        double newX = x + steering.getVelocityX();
-        double newY = y + steering.getVelocityY();
-
-        // Vérifier les collisions avec la hitbox
-        if (map != null) {
-            if (!collidesWithWall(newX, newY)) {
-                // Pas de collision : on avance normalement
-                x = newX;
-                y = newY;
-            } else {
-                // COLLISION ! On essaie de glisser.
-                boolean movedX = false;
-                boolean movedY = false;
-
-                // Essai mouvement horizontal uniquement (Glissade sur mur vertical)
-                if (!collidesWithWall(newX, y)) {
-                    x = newX;
-                    movedX = true;
-                    // IMPORTANT : On a tapé un mur horizontal (en Y), donc on annule la vitesse Y
-                    steering.killVelocityY();
-                }
-                // Essai mouvement vertical uniquement (Glissade sur mur horizontal)
-                else if (!collidesWithWall(x, newY)) {
-                    y = newY;
-                    movedY = true;
-                    // IMPORTANT : On a tapé un mur vertical (en X), donc on annule la vitesse X
-                    steering.killVelocityX();
-                }
-
-                // Si on est bloqué des deux côtés (coin)
-                if (!movedX && !movedY) {
-                    steering.reset(); // Arrêt complet pour ne pas accumuler de force dans le mur
-                }
-            }
-        } else {
-            x = newX;
-            y = newY;
-        }
-
-        // Vérifier si arrivé à destination
-        if (waypointIndex == chemin.size() - 1 && distance < 5) {
+        // Arrêt final au dernier point
+        if (waypointIndex == chemin.size() - 1 && distToTarget < 5) {
+            x = cible.getX();
+            y = cible.getY();
             arrived = true;
+            steering.reset();
+            return;
         }
-    }
 
-    // Getters
-    public double getX() { return x; }
-    public double getY() { return y; }
-    public double getRotation() { return steering.getRotation(); }
-    public double getSpeed() { return steering.getSpeed(); }
-    public boolean isArrived() { return arrived; }
-    public List<Noeud> getChemin() { return chemin; }
-    public int getWaypointIndex() { return waypointIndex; }
+        // Calcul de la direction souhaitée via le steering
+        steering.seek(x, y, cible.getX(), cible.getY());
 
-    /**
-     * Retourne le waypoint actuel ciblé
-     */
-    public Noeud getCurrentWaypoint() {
-        if (chemin.isEmpty() || waypointIndex >= chemin.size()) {
-            return null;
-        }
-        return chemin.get(waypointIndex);
-    }
+        // Calcul des positions futures potentielles
+        double nextX = x + steering.getVelocityX();
+        double nextY = y + steering.getVelocityY();
 
-    // Configuration
-    public void setWaypointTolerance(double tolerance) {
-        this.waypointTolerance = tolerance;
-    }
+        // Gestion des collisions par itération sur getMurs()
+        boolean collisionX = false;
+        boolean collisionY = false;
 
-    public void setMap(Map map) {
-        this.map = map;
-    }
-
-    public SteeringBehavior getSteering() {
-        return steering;
-    }
-
-    /**
-     * Vérifie si la position donnée entre en collision avec un mur
-     * en tenant compte du rayon du monstre.
-     */
-    private boolean collidesWithWall(double posX, double posY) {
-        if (map == null) return false;
-
-        // Vérifier plusieurs points autour du cercle de la hitbox
-        int numPoints = 8;
-        for (int i = 0; i < numPoints; i++) {
-            double angle = 2 * Math.PI * i / numPoints;
-            int checkX = (int) (posX + RAYON * Math.cos(angle));
-            int checkY = (int) (posY + RAYON * Math.sin(angle));
-            if (map.estDansMur(checkX, checkY)) {
-                return true;
+        // On définit une boîte de collision simple pour le monstre
+        // On utilise RAYON pour donner de l'épaisseur au monstre
+        for (Mur mur : map.getMurs()) {
+            // Test collision sur l'axe X
+            if (mur.esDansMur((int) nextX, (int) y)) {
+                collisionX = true;
+            }
+            // Test collision sur l'axe Y
+            if (mur.esDansMur((int) x, (int) nextY)) {
+                collisionY = true;
             }
         }
-        // Vérifier aussi le centre
-        return map.estDansMur((int) posX, (int) posY);
-    }
-}
 
+        // Application du mouvement si aucune collision n'est détectée
+        if (!collisionX) {
+            x = nextX;
+        } else {
+            steering.reset(); // On stoppe la force si on tape un mur
+        }
+
+        if (!collisionY) {
+            y = nextY;
+        } else {
+            steering.reset();
+        }
+    }
+
+    private void recalculerChemin() {
+        if (destination == null) return;
+
+        // Le RRT va d'abord chercher dans ses souvenirs (graphe existant)
+        Noeud finChemin = RRT.trouverChemin((int) x, (int) y, destination.getX(), destination.getY());
+
+        if (finChemin == null) return;
+
+        chemin.clear();
+        waypointIndex = 0;
+        arrived = false;
+
+        while (finChemin != null) {
+            chemin.add(0, finChemin);
+            finChemin = finChemin.getParent();
+        }
+    }
+
+
+    /**
+     * Méthode générique pour calculer un chemin vers n'importe quelle coordonnée
+     */
+    public void recalculerCheminVers(int targetX, int targetY) {
+        Noeud fin = RRT.trouverChemin((int) x, (int) y, targetX, targetY);
+
+        if (fin == null) return;
+
+        chemin.clear();
+        waypointIndex = 0;
+        arrived = false;
+
+        // Reconstituer le chemin à partir des parents
+        while (fin != null) {
+            chemin.add(0, fin);
+            fin = fin.getParent();
+        }
+    }
+
+    // ===================== UTILS =====================
+
+    private double distance(Noeud n) {
+        return Math.sqrt(Math.pow(n.getX() - x, 2)
+                + Math.pow(n.getY() - y, 2));
+    }
+
+    public Target getTarget() {
+        return target;
+    }
+
+    // ===================== SETTERS =====================
+
+    public void setTarget(Target target) {
+        this.target = target;
+    }
+
+    public void setPointsPatrouille(Noeud a, Noeud b) {
+        this.pointA = a;
+        this.pointB = b;
+    }
+
+    public Automate.Etat getEtat(){
+        return automate.getEtat();
+    }
+
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
+
+    public void updatePatrouille() {
+
+        // Avancer le long du chemin courant
+        updateMouvement();
+
+        // Si réellement arrivé au point
+        if (arrived && destination != null) {
+
+            // Alterner vers l'autre point
+            destination = (destination == pointA) ? pointB : pointA;
+
+            System.out.println("[Monstre] Arrivé au point "
+                    + (destination == pointA ? "B" : "A")
+                    + " → Nouvelle destination : "
+                    + (destination == pointA ? "A" : "B"));
+
+            recalculerChemin();
+        }
+    }
+
+    public void updatePoursuite() {
+        if (target == null) return;
+
+        // Calcul de la distance entre la position actuelle de la cible et la dernière position connue
+        double distanceCibleBougee = Math.sqrt(Math.pow(target.getX() - lastTargetX, 2)
+                + Math.pow(target.getY() - lastTargetY, 2));
+
+        // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement
+        if (chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) {
+            recalculerCheminVers((int)target.getX(), (int)target.getY());
+
+            // Mise à jour de la dernière position connue
+            lastTargetX = target.getX();
+            lastTargetY = target.getY();
+        }
+
+        // On appelle le mouvement physique
+        updateMouvement();
+    }
+
+    public ArrayList<Noeud> getChemin() {
+        for (Noeud n : chemin) {
+            System.out.print("(" + n.getX() + ", " + n.getY() + ")->");
+        }
+        if(chemin == null) return new ArrayList<>();
+        return new ArrayList<>(chemin);
+
+    }
+
+    public double getDistanceDetection() {
+        return distanceDetection;
+    }
+
+    public double getRotation(){
+        if (target == null) return 0;
+        double angle = Math.atan2(target.getY() - y, target.getX() - x);
+        return Math.toDegrees(angle);
+    }
+
+    private void repousserMur() {
+        double separationX = 0;
+        double separationY = 0;
+        double probeDistance = RAYON + 4; // Sonder un peu plus loin que la hitbox
+        int numProbes = 8;
+
+        for (int i = 0; i < numProbes; i++) {
+            double angle = 2 * Math.PI * i / numProbes;
+            int probeX = (int) (x + probeDistance * Math.cos(angle));
+            int probeY = (int) (y + probeDistance * Math.sin(angle));
+
+            if (map.estDansMur(probeX, probeY)) {
+                // Pousser dans la direction opposée au mur
+                separationX -= Math.cos(angle);
+                separationY -= Math.sin(angle);
+            }
+        }
+
+        // Normaliser et appliquer la force de séparation
+        double mag = Math.sqrt(separationX * separationX + separationY * separationY);
+        if (mag > 0) {
+            double separationForce = 0.5; // Force de répulsion assez forte
+            separationX = (separationX / mag) * separationForce;
+            separationY = (separationY / mag) * separationForce;
+            steering.applySeparation(separationX, separationY);
+        }
+    }
+
+}

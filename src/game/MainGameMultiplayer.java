@@ -1,5 +1,11 @@
 package game;
 
+import entite.Joueur;
+import java.awt.*;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.*;
+import java.util.List;
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -9,13 +15,6 @@ import moteur_graphique.Window;
 import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
 import moteur_graphique.raycasting.Raycasting;
-import entite.Joueur;
-
-import java.awt.*;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.*;
-import java.util.List;
 
 /**
  * Classe principale du jeu multijoueur. Coordonne les différents composants :
@@ -48,11 +47,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
      * @param useBSP true pour utiliser BSP, false pour Raycasting
      */
     public MainGameMultiplayer(String playerId, int port, String serverIp, int serverPort, boolean useBSP) {
-        window = new Window(1920, 1080);
+        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT);
 
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
-
 
         GameRenderer renderer;
         Raycasting raycasting;
@@ -84,13 +82,13 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         network.setNetworkListener(this);
         network.start();
 
-        spriteManager = new PlayerSpriteManager(raycasting, network);
+        spriteManager = new PlayerSpriteManager(renderer, network);
 
         gameLoop = new GameLoop(this);
 
-
         if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
             network.connectToPlayer("Server", serverIp, serverPort);
+        }
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
@@ -121,7 +119,6 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         if (moved) {
             network.sendPlayerPosition();
         }
-
 
         updateScoreboard();
 
@@ -184,11 +181,11 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         return moved;
     }
 
+
     @Override
     public void setFPS(int fps) {
         window.setFPS(fps);
     }
-
 
     private boolean applyMovement(double dx, double dy) {
         boolean moved = false;
