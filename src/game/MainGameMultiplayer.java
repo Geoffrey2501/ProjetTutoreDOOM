@@ -53,6 +53,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         joueur = new Joueur(playerId, GameConfig.PLAYER_START_X, GameConfig.PLAYER_START_Y, GameConfig.PLAYER_START_ANGLE);
         input = new Input();
 
+
         GameRenderer renderer;
         Raycasting raycasting;
 
@@ -87,9 +88,9 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         gameLoop = new GameLoop(this);
 
+
         if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {
             network.connectToPlayer("Server", serverIp, serverPort);
-        }
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
     }
@@ -120,6 +121,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         if (moved) {
             network.sendPlayerPosition();
         }
+
 
         updateScoreboard();
 
@@ -181,6 +183,12 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         return moved;
     }
+
+    @Override
+    public void setFPS(int fps) {
+        window.setFPS(fps);
+    }
+
 
     private boolean applyMovement(double dx, double dy) {
         boolean moved = false;

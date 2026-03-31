@@ -19,4 +19,9 @@ public interface GameLoopListener {
      * Appelé quand la boucle de jeu se termine.
      */
     void onShutdown();
+
+    /**
+     * Reçoit la mise à jour du nombre d'images par seconde.
+     */
+    default void setFPS(int fps) {}
 }

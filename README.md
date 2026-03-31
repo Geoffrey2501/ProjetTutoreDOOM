@@ -154,3 +154,4 @@ Ce projet implémente plusieurs concepts avancés "from scratch" :
 - **Réseau P2P (Peer-to-Peer)** : Architecture décentralisée (maillage complet) où chaque joueur envoie sa position et ses actions directement aux autres pairs, sans serveur central dédié.
 - **Intelligence Artificielle (RRT)** : Algorithme *Rapidly-exploring Random Tree* pour la navigation des monstres (démos disponibles via `make run-rrt` ou `src/monstre/MainRRT.java`).
 - **Cartes** : Fichiers de niveau au format texte dans `assets/maps/`.
+

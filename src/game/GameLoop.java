@@ -30,12 +30,23 @@ public class GameLoop implements Runnable {
     public void run() {
         running = true;
         long lastLoopTime = System.nanoTime();
+        long lastFpsTime = 0;
+        int fpsCounter = 0;
 
         while (running) {
             long now = System.nanoTime();
             long updateLength = now - lastLoopTime;
             lastLoopTime = now;
             double delta = updateLength / 1_000_000_000.0;
+
+            // --- CALCUL DES FPS ---
+            lastFpsTime += updateLength;
+            fpsCounter++;
+            if (lastFpsTime >= 1_000_000_000L) { // Toutes les secondes
+                listener.setFPS(fpsCounter);
+                fpsCounter = 0;
+                lastFpsTime %= 1_000_000_000L;
+            }
 
             // Mise à jour de la logique
             listener.update(delta);
