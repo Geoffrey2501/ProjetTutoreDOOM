@@ -86,6 +86,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         spriteManager = new PlayerSpriteManager(renderer, network);
         monsterSpriteManager = new MonsterSpriteManager(renderer);
 
+        if (useBSP) {
+            monsterSpriteManager.onMonsterMove("DarkJonesy", GameConfig.PLAYER_START_X + 2, GameConfig.PLAYER_START_Y + 0.5);
+        }
+
         gameLoop = new GameLoop(this);
 
         if (serverIp != null && !serverIp.isEmpty() && serverPort > 0) {

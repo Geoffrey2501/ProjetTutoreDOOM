@@ -120,7 +120,7 @@ public class Raycasting implements GameRenderer {
     private RayResult executerDDA(double rayAngle, double joueurX, double joueurY) {
         boolean[][] mapData = map.getGrid();
         int mapWidth = map.getWIDTH();
-        int mapHeight = map.getHeight();
+        int mapHeight = map.getHEIGHT();
 
         RayResult result = new RayResult();
         result.rayDirX = Math.cos(rayAngle);

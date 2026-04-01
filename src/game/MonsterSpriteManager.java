@@ -27,7 +27,7 @@ public class MonsterSpriteManager {
             Sprite sprite = monsterSprites.get(monsterId);
             if (sprite == null) {
                 // Création du sprite de monstre (en supposant qu'il utilise jonesy.png comme texture temporaire ou autre chose)
-                sprite = new Sprite(x, y, "assets/sprites/jonesy.png", "Monstre " + monsterId);
+                sprite = new Sprite(x, y, "assets/sprites/Dark_Jonesy.png", "Monstre " + monsterId);
                 monsterSprites.put(monsterId, sprite);
                 renderer.addSprite(sprite);
             } else {
