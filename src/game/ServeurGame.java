@@ -63,8 +63,25 @@ public class ServeurGame extends Serveur {
 
         if (message.startsWith("MOVE:")) {
             processGameMoveMessage(message, sender);
+        } else if (message.startsWith("MONSTER_MOVE:")) {
+            processMonsterMoveMessage(message, sender);
         } else {
             super.processMessageFromPeer(message, sender);
+        }
+    }
+
+    private void processMonsterMoveMessage(String message, GestionConnection sender) {
+        try {
+            String content = message.substring(13); // Remove "MONSTER_MOVE:"
+            int colonIndex = content.indexOf(':');
+            if (colonIndex == -1) return;
+
+            String monsterId = content.substring(0, colonIndex);
+            String positionData = content.substring(colonIndex + 1);
+
+            adapter.onMonsterPositionReceived(monsterId, positionData);
+        } catch (Exception e) {
+            System.err.println("Erreur de parsing de mouvement de monstre : " + message);
         }
     }
 
@@ -100,4 +117,3 @@ public class ServeurGame extends Serveur {
         }
     }
 }
-

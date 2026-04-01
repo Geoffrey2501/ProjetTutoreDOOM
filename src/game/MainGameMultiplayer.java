@@ -32,6 +32,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     // === Contrôleurs ===
     private final MouseGestion mouseCaptureHandler;
     private final PlayerSpriteManager spriteManager;
+    private final MonsterSpriteManager monsterSpriteManager;
     private final GameLoop gameLoop;
 
     // === Réseau ===
@@ -83,6 +84,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         network.start();
 
         spriteManager = new PlayerSpriteManager(renderer, network);
+        monsterSpriteManager = new MonsterSpriteManager(renderer);
 
         gameLoop = new GameLoop(this);
 
@@ -240,6 +242,11 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         if (spriteManager.onPlayerLeave(playerId)) {
             window.addLogMessage(playerId + " a quitté la partie", Color.RED);
         }
+    }
+
+    @Override
+    public void onMonsterMove(String monsterId, double x, double y) {
+        monsterSpriteManager.onMonsterMove(monsterId, x, y);
     }
 
     /**
