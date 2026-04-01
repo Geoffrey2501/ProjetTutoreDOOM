@@ -151,6 +151,19 @@ public class GameNetworkAdapter {
     }
 
     /**
+     * Obtenir les positions de tous les joueurs distants
+     * @return Map des positions (playerId -> [x, y, angle])
+     */
+    public Map<String, double[]> getRemotePlayersPositions() {
+        Map<String, double[]> positions = new ConcurrentHashMap<>();
+        for (Map.Entry<String, Joueur> entry : remotePlayers.entrySet()) {
+            Joueur player = entry.getValue();
+            positions.put(entry.getKey(), new double[]{player.getX(), player.getY(), player.getAngle()});
+        }
+        return positions;
+    }
+
+    /**
      * Arrêter le serveur réseau
      */
     public void shutdown() {

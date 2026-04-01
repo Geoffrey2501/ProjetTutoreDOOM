@@ -11,6 +11,7 @@ import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
 import moteur_graphique.CollisionStrategy;
 import moteur_graphique.GameRenderer;
+import moteur_graphique.MinimapRenderer;
 import moteur_graphique.Window;
 import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
@@ -73,11 +74,14 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         window.setRenderer(renderer);
 
+        // Créer et configurer la minimap
+        GameRenderer minimapRenderer = new MinimapRenderer(joueur, collision, network = new GameNetworkAdapter(playerId, "localhost", port));
+        window.setMinimapRenderer(minimapRenderer);
+
         window.addInputListener(input);
 
         mouseCaptureHandler = new MouseGestion(window, input);
 
-        network = new GameNetworkAdapter(playerId, "localhost", port);
         network.setLocalPlayer(joueur);
         network.setNetworkListener(this);
         network.start();

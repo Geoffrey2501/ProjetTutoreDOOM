@@ -14,6 +14,7 @@ public class Window extends JFrame {
     // Composant de dessin
     private final CanvasPanel panelDessin;
     private GameRenderer renderer;
+    private GameRenderer minimapRenderer;
 
     private int currentFps = 0;
 
@@ -113,6 +114,10 @@ public class Window extends JFrame {
         this.renderer = renderer;
     }
 
+    public void setMinimapRenderer(GameRenderer minimapRenderer) {
+        this.minimapRenderer = minimapRenderer;
+    }
+
     /**
      * Appelé par la boucle de jeu pour rafraîchir l'écran
      */
@@ -171,7 +176,12 @@ public class Window extends JFrame {
                 renderer.render(g, getWidth(), getHeight());
             }
 
-            // 2. Dessiner l'UI par dessus
+            // 2. Dessiner la minimap par-dessus (si disponible)
+            if (minimapRenderer != null) {
+                minimapRenderer.render(g, getWidth(), getHeight());
+            }
+
+            // 3. Dessiner l'UI par dessus
             dessinerFPS(g);
             dessinerLogs(g);
             if (showScoreboard) {
