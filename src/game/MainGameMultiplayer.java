@@ -35,6 +35,8 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     private final MonsterSpriteManager monsterSpriteManager;
     private final GameLoop gameLoop;
 
+    private Thread monsterThread;
+
     // === Réseau ===
     private final GameNetworkAdapter network;
 
@@ -87,7 +89,36 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         monsterSpriteManager = new MonsterSpriteManager(renderer);
 
         if (useBSP) {
-            monsterSpriteManager.onMonsterMove("DarkJonesy", GameConfig.PLAYER_START_X + 2, GameConfig.PLAYER_START_Y + 0.5);
+            String monsterId = "DarkJonesy";
+            double[] monsterPos = {GameConfig.PLAYER_START_X + 2, GameConfig.PLAYER_START_Y + 0.5};
+            monsterSpriteManager.onMonsterMove(monsterId, monsterPos[0], monsterPos[1]);
+
+            monsterThread = new Thread(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+
+                    double dx = joueur.getX() - monsterPos[0];
+                    double dy = joueur.getY() - monsterPos[1];
+                    double distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance > 0.5) {
+                        double speed = 0.05;
+                        monsterPos[0] += (dx / distance) * speed;
+                        monsterPos[1] += (dy / distance) * speed;
+
+                        synchronized (monsterSpriteManager) {
+                            monsterSpriteManager.onMonsterMove(monsterId, monsterPos[0], monsterPos[1]);
+                        }
+                    }
+                }
+            });
+            monsterThread.setDaemon(true);
+            monsterThread.start();
         }
 
         gameLoop = new GameLoop(this);
@@ -138,6 +169,9 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
     @Override
     public void onShutdown() {
+        if (monsterThread != null) {
+            monsterThread.interrupt();
+        }
         network.shutdown();
     }
 
