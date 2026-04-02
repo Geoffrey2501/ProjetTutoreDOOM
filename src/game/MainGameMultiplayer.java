@@ -74,16 +74,19 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         window.setRenderer(renderer);
 
-        // Créer et configurer la minimap
-        GameRenderer minimapRenderer = new MinimapRenderer(joueur, collision, network = new GameNetworkAdapter(playerId, "localhost", port));
+        // Créer l'adaptateur réseau d'abord
+        network = new GameNetworkAdapter(playerId, "localhost", port);
+        network.setLocalPlayer(joueur);
+        network.setNetworkListener(this);
+
+        // Puis créer la minimap avec le network
+        GameRenderer minimapRenderer = new MinimapRenderer(joueur, collision, network);
         window.setMinimapRenderer(minimapRenderer);
 
         window.addInputListener(input);
 
         mouseCaptureHandler = new MouseGestion(window, input);
 
-        network.setLocalPlayer(joueur);
-        network.setNetworkListener(this);
         network.start();
 
         spriteManager = new PlayerSpriteManager(renderer, network);
@@ -95,6 +98,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         }
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
+        window.addLogMessage("TAB: Afficher joueurs | FPS en haut à gauche", Color.YELLOW);
     }
 
     /**

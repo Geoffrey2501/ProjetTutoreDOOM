@@ -4,6 +4,7 @@ import entite.Joueur;
 import entite.Sprite;
 import game.GameNetworkAdapter;
 import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -67,8 +68,10 @@ public class MinimapRenderer implements GameRenderer {
         g2d.setStroke(new BasicStroke(2));
         g2d.drawRect(minimapX, minimapY, MINIMAP_WIDTH, MINIMAP_HEIGHT);
 
-        // Créer un Graphics2D clippé pour la minimap
+        // Sauvegarder le contexte graphique complet
+        AffineTransform oldTransform = g2d.getTransform();
         Shape oldClip = g2d.getClip();
+        
         g2d.clipRect(minimapX, minimapY, MINIMAP_WIDTH, MINIMAP_HEIGHT);
 
         // Décaler l'origine au centre de la minimap
@@ -83,9 +86,9 @@ public class MinimapRenderer implements GameRenderer {
         // Dessiner les autres joueurs
         drawRemotePlayers(g2d);
 
-        // Restaurer les paramètres graphiques
+        // Restaurer complètement le contexte graphique
+        g2d.setTransform(oldTransform);
         g2d.setClip(oldClip);
-        g2d.translate(-(minimapX + MINIMAP_WIDTH / 2.0), -(minimapY + MINIMAP_HEIGHT / 2.0));
 
         // Afficher le label
         g2d.setColor(Color.WHITE);

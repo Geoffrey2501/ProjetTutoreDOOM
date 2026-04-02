@@ -2,8 +2,7 @@ package moteur_graphique;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.event.*;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -16,7 +15,7 @@ public class Window extends JFrame {
     private GameRenderer renderer;
     private GameRenderer minimapRenderer;
 
-    private int currentFps = 0;
+    private int currentFps = 60;  // Initialisé à 60 par défaut
 
     public void setFPS(int fps) {
         this.currentFps = fps;
@@ -24,15 +23,25 @@ public class Window extends JFrame {
 
     private void dessinerFPS(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
-        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 14));
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setFont(new Font(FONT_ARIAL, Font.BOLD, 16));
 
-        // Petit fond sombre pour la lisibilité
-        g2d.setColor(new Color(0, 0, 0, 150));
-        g2d.fillRect(5, 5, 70, 22);
+        String fpsText = "FPS: " + currentFps;
+        FontMetrics fm = g2d.getFontMetrics();
+        int textWidth = fm.stringWidth(fpsText);
+        int textHeight = fm.getAscent();
+
+        // Fond sombre rectangulaire avec bordure
+        g2d.setColor(new Color(0, 0, 0, 200));
+        g2d.fillRect(10, 10, textWidth + 16, textHeight + 10);
+        
+        g2d.setColor(new Color(100, 100, 100));
+        g2d.setStroke(new BasicStroke(2));
+        g2d.drawRect(10, 10, textWidth + 16, textHeight + 10);
 
         // Texte en jaune
         g2d.setColor(Color.YELLOW);
-        g2d.drawString("FPS: " + currentFps, 12, 21);
+        g2d.drawString(fpsText, 18, 26);
     }
 
     // --- GESTION UI (Logs & Scoreboard) ---
@@ -87,7 +96,28 @@ public class Window extends JFrame {
         panelDessin = new CanvasPanel();
         panelDessin.setBackground(Color.BLACK);
         panelDessin.setFocusable(true);
+        
+        // Désactiver la traversal par TAB AVANT d'ajouter les listeners
         disableFocusTraversal(panelDessin);
+        disableFocusTraversal(this);
+
+        // FocusListener pour s'assurer que le panel reste actif pour les événements clavier
+        panelDessin.addFocusListener(new FocusListener() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                // Panel a le focus - bien
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                // Redonner le focus au panel si le focus passe ailleurs
+                SwingUtilities.invokeLater(() -> {
+                    if (!panelDessin.hasFocus()) {
+                        panelDessin.requestFocusInWindow();
+                    }
+                });
+            }
+        });
 
         add(panelDessin);
 
@@ -99,8 +129,25 @@ public class Window extends JFrame {
             }
         });
 
+        // Listener pour s'assurer que le CanvasPanel garde le focus
+        addWindowFocusListener(new WindowFocusListener() {
+            @Override
+            public void windowGainedFocus(WindowEvent e) {
+                panelDessin.requestFocusInWindow();
+            }
+
+            @Override
+            public void windowLostFocus(WindowEvent e) {
+                // Rien à faire
+            }
+        });
+
         setVisible(true);
-        panelDessin.requestFocusInWindow();
+        // Forcer le focus APRÈS que setVisible soit appelé
+        SwingUtilities.invokeLater(() -> {
+            panelDessin.requestFocusInWindow();
+            panelDessin.setFocusable(true);
+        });
     }
 
     private static void disableFocusTraversal(Component component) {
