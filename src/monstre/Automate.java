@@ -94,6 +94,7 @@ public class Automate{
 
         if (nouvelEtat == Etat.POURSUITE) {
             monstre.resetSteering();
+            monstre.alerterAutresMonstres(); // Alerte les autres monstres autour
         }
     }
 

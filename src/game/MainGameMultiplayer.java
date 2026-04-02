@@ -142,11 +142,24 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
                             }
 
                             if (target != null && minDist > 0.5) {
-                                double dx = target.getX() - m.pos[0];
-                                double dy = target.getY() - m.pos[1];
+                                // Calcul de l'encerclement (système de slots d'attaque)
+                                int maxMonsters = monsters.size();
+                                int monsterIndex = monsters.indexOf(m);
+                                double angleSlot = (2 * Math.PI / maxMonsters) * monsterIndex;
+                                double distanceEncerclement = 2.0;
+
+                                double slotX = target.getX() + Math.cos(angleSlot) * distanceEncerclement;
+                                double slotY = target.getY() + Math.sin(angleSlot) * distanceEncerclement;
+
+                                double sdx = slotX - m.pos[0];
+                                double sdy = slotY - m.pos[1];
+                                double sd = Math.sqrt(sdx * sdx + sdy * sdy);
+
                                 double speed = 0.05;
-                                m.pos[0] += (dx / minDist) * speed;
-                                m.pos[1] += (dy / minDist) * speed;
+                                if (sd > 0.1) {
+                                    m.pos[0] += (sdx / sd) * speed;
+                                    m.pos[1] += (sdy / sd) * speed;
+                                }
 
                                 synchronized (monsterSpriteManager) {
                                     monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);

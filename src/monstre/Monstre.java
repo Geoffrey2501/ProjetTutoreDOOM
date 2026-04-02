@@ -6,6 +6,9 @@ import java.util.List;
 public class Monstre {
 
     public static final int RAYON = 5;
+    
+    // Liste globale pour accéder aux autres monstres (séparation et alerte)
+    public static List<Monstre> tousLesMonstres = new ArrayList<>();
 
     private double x, y;
     private final SteeringBehavior steering;
@@ -20,7 +23,7 @@ public class Monstre {
     private Noeud destination;
 
     private Target target;
-    private double distanceDetection = 150;
+    private double distanceDetection = 50;
 
     private final Automate automate;
 
@@ -37,7 +40,7 @@ public class Monstre {
         this.map = map;
         this.steering = new SteeringBehavior();
         this.automate = new Automate(this);
-
+        tousLesMonstres.add(this);
     }
 
     // ===================== UPDATE =====================
@@ -232,6 +235,8 @@ public class Monstre {
 
     public void updatePoursuite() {
         if (target == null) return;
+        
+        applySocialSteering(tousLesMonstres);
 
         // Calcul de la distance entre la position actuelle de la cible et la dernière position connue
         double distanceCibleBougee = Math.sqrt(Math.pow(target.getX() - lastTargetX, 2)
@@ -297,4 +302,51 @@ public class Monstre {
         }
     }
 
+    /**
+     * Applique une force de séparation par rapport aux autres monstres
+     * pour éviter qu'ils ne se chevauchent (Social Steering).
+     */
+    public void applySocialSteering(List<Monstre> autresMonstres) {
+        double separationX = 0;
+        double separationY = 0;
+        double minDistance = RAYON * 4; // Distance minimale souhaitée entre les monstres
+        
+        for (Monstre autre : autresMonstres) {
+            if (autre != this) {
+                double dx = x - autre.getX();
+                double dy = y - autre.getY();
+                double dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 0 && dist < minDistance) {
+                    separationX += dx / dist; // Force inverse proportionnelle
+                    separationY += dy / dist;
+                }
+            }
+        }
+        
+        double mag = Math.sqrt(separationX * separationX + separationY * separationY);
+        if (mag > 0) {
+            double separationForce = 0.8; // Modulateur de la force
+            separationX = (separationX / mag) * separationForce;
+            separationY = (separationY / mag) * separationForce;
+            steering.applySeparation(separationX, separationY);
+        }
+    }
+
+    /**
+     * Propage l'alerte aux monstres environnants lorsqu'une cible est détectée.
+     */
+    public void alerterAutresMonstres() {
+        if (target == null) return;
+        double rayonAlerte = 300.0;
+        
+        for (Monstre autre : tousLesMonstres) {
+            if (autre != this && autre.getEtat() != Automate.Etat.POURSUITE) {
+                double dist = Math.sqrt(Math.pow(autre.getX() - x, 2) + Math.pow(autre.getY() - y, 2));
+                if (dist <= rayonAlerte) {
+                    autre.setTarget(this.target);
+                    // L'automate passera en POURSUITE à la prochaine update si la cible est partagée
+                }
+            }
+        }
+    }
 }
