@@ -134,6 +134,32 @@ public class GameNetworkAdapter {
     }
 
     /**
+     * Envoyer la position d'un monstre à tous les pairs
+     */
+    public void sendMonsterPosition(String monsterId, double x, double y) {
+        String message = "MONSTER_MOVE:" + monsterId + ":" + x + "," + y;
+        serveur.broadcastToPeers(message);
+    }
+
+    /**
+     * Gérer la réception de la position d'un monstre
+     */
+    public void onMonsterPositionReceived(String monsterId, String positionData) {
+        try {
+            String[] parts = positionData.split(",");
+            if (parts.length >= 2) {
+                double x = Double.parseDouble(parts[0]);
+                double y = Double.parseDouble(parts[1]);
+                if (listener != null) {
+                    listener.onMonsterMove(monsterId, x, y);
+                }
+            }
+        } catch (NumberFormatException e) {
+            // Ignorer l'erreur
+        }
+    }
+
+    /**
      * Obtenir la liste des joueurs distants
      * @return Map des joueurs distants
      */

@@ -112,7 +112,7 @@ public class MapBool {
         return width;
     }
 
-    public int getHeight() {
+    public int getHEIGHT() {
         return height;
     }
 

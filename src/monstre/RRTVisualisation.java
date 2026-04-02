@@ -15,7 +15,9 @@ public class RRTVisualisation extends JPanel {
     private final Map map;
     private List<Noeud> noeuds;
     private List<Noeud> chemin;
-    private Monstre monstre;
+    
+    // Remplacer le monstre unique par une liste de monstres
+    private List<Monstre> monstres = new ArrayList<>();
 
     // Joueurs à afficher
     private Joueur joueur1;
@@ -32,9 +34,20 @@ public class RRTVisualisation extends JPanel {
     // Cache pour ne pas redessiner le fond statique à chaque image (Optimisation)
     private BufferedImage backgroundCache;
 
+    public RRTVisualisation(Map map, List<Monstre> monstres) {
+        this.map = map;
+        this.monstres = monstres;
+        this.noeuds = new ArrayList<>();
+        this.chemin = new ArrayList<>();
+
+        // Configuration graphique
+        this.setDoubleBuffered(true);
+        this.setPreferredSize(new Dimension(map.getLargeur(), map.getHauteur()));
+    }
+
     public RRTVisualisation(Map map, Monstre monstre) {
         this.map = map;
-        this.monstre = monstre;
+        this.monstres.add(monstre);
         this.noeuds = new ArrayList<>();
         this.chemin = new ArrayList<>();
 
@@ -46,7 +59,7 @@ public class RRTVisualisation extends JPanel {
     public RRTVisualisation(Map map, List<Noeud> noeuds, Noeud debut, Noeud fin, Monstre monstre) {
         this.map = map;
         this.noeuds = noeuds;
-        this.monstre = monstre;
+        this.monstres.add(monstre);
         this.chemin = reconstruireChemin(fin);
 
         // Configuration graphique
@@ -55,8 +68,7 @@ public class RRTVisualisation extends JPanel {
     }
 
     /**
-     * Met à jour l'arbre RRT et le chemin optimal après un nouveau calcul.
-     * Invalide le cache du fond pour redessiner.
+     * Met à jour le chemin affiché (peut être utilisé pour le monstre principal)
      */
     public void updateRRT(List<Noeud> noeuds, Noeud fin) {
         this.noeuds = noeuds;
@@ -109,7 +121,7 @@ public class RRTVisualisation extends JPanel {
         drawJoueurs(g2d);
 
         // 4. Dessiner le monstre (Dynamique)
-        if (monstre != null) {
+        if (monstres != null) {
             drawMonstre(g2d);
         }
     }
@@ -190,50 +202,48 @@ public class RRTVisualisation extends JPanel {
     }
 
     private void drawMonstre(Graphics2D g2d) {
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        for (Monstre m : monstres) {
+            if (m != null) {
+                double x = m.getX();
+                double y = m.getY();
 
-        double mx = monstre.getX();
-        double my = monstre.getY();
+                // Dessiner le champ de vision (rayon de détection)
+                g2d.setColor(new Color(255, 0, 0, 30)); // Rouge très transparent
+                int rayon = (int) m.getDistanceDetection();
+                g2d.fillOval((int) x - rayon, (int) y - rayon, rayon * 2, rayon * 2);
 
-        // Rayon de détection (cercle semi-transparent)
-        double rayonDetection = monstre.getDistanceDetection();
-        if (rayonDetection > 0) {
-            g2d.setColor(new Color(255, 200, 0, 30));  // Jaune transparent
-            g2d.fill(new Ellipse2D.Double(mx - rayonDetection, my - rayonDetection,
-                                          rayonDetection * 2, rayonDetection * 2));
-            g2d.setColor(new Color(255, 200, 0, 100));
-            g2d.setStroke(new BasicStroke(1));
-            g2d.draw(new Ellipse2D.Double(mx - rayonDetection, my - rayonDetection,
-                                          rayonDetection * 2, rayonDetection * 2));
+                // Dessiner la zone d'alerte
+                g2d.setColor(new Color(255, 200, 0, 15)); // Orange super transparent
+                int rayonAlerte = 300;
+                g2d.fillOval((int) x - rayonAlerte, (int) y - rayonAlerte, rayonAlerte * 2, rayonAlerte * 2);
+
+                // Couleur en fonction de l'état
+                Color couleurMonstre;
+                Automate.Etat etat = m.getEtat();
+
+                if (etat == Automate.Etat.POURSUITE) {
+                    couleurMonstre = Color.RED; // Rouge si chasse
+                } else if (etat == Automate.Etat.PATROUILLE) {
+                    couleurMonstre = Color.ORANGE; // Orange si patrouille
+                } else {
+                    couleurMonstre = Color.GRAY; // Gris si attente
+                }
+
+                g2d.setColor(couleurMonstre);
+                g2d.fill(new Ellipse2D.Double(x - 5, y - 5, 10, 10));
+
+                // Dessiner une ligne indiquant la direction
+                g2d.setColor(Color.BLACK);
+                double angleDirection = Math.toRadians(m.getRotation());
+                int lineEndX = (int) (x + 15 * Math.cos(angleDirection));
+                int lineEndY = (int) (y + 15 * Math.sin(angleDirection));
+                g2d.drawLine((int) x, (int) y, lineEndX, lineEndY);
+
+                // Texte de l'état
+                g2d.setFont(new Font("Arial", Font.BOLD, 10));
+                g2d.drawString(etat != null ? etat.toString() : "N/A", (int) x - 15, (int) y - 10);
+            }
         }
-
-        // Corps (couleur selon l'état)
-        Automate.Etat etat = monstre.getEtat();
-        switch (etat) {
-            case ATTENTE:
-                g2d.setColor(new Color(100, 100, 100));  // Gris
-                break;
-            case PATROUILLE:
-                g2d.setColor(new Color(0, 128, 255));    // Bleu
-                break;
-            case POURSUITE:
-                g2d.setColor(new Color(255, 0, 0));      // Rouge
-                break;
-            default:
-                g2d.setColor(new Color(128, 0, 128));    // Violet
-        }
-        g2d.fill(new Ellipse2D.Double(mx - 10, my - 10, 20, 20));
-
-        // Direction
-        g2d.setColor(Color.YELLOW);
-        g2d.setStroke(new BasicStroke(2));
-        double rot = monstre.getRotation();
-        g2d.drawLine((int)mx, (int)my, (int)(mx + Math.cos(rot)*15), (int)(my + Math.sin(rot)*15));
-
-        // Afficher l'état en texte
-        g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.BOLD, 12));
-        g2d.drawString(etat.toString(), (int)mx - 30, (int)my - 15);
     }
 
     /**
@@ -315,8 +325,8 @@ public class RRTVisualisation extends JPanel {
         }
 
         // Afficher quelle cible est active (cercle autour)
-        if (monstre != null && monstre.getTarget() != null) {
-            Target target = monstre.getTarget();
+        if (monstres != null && !monstres.isEmpty() && monstres.get(0).getTarget() != null) {
+            Target target = monstres.get(0).getTarget();
             g2d.setColor(Color.GREEN);
             g2d.setStroke(new BasicStroke(2));
             g2d.drawOval((int)target.getX() - 12, (int)target.getY() - 12, 24, 24);
@@ -334,3 +344,4 @@ public class RRTVisualisation extends JPanel {
         return liste;
     }
 }
+

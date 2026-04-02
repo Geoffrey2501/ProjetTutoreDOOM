@@ -6,6 +6,9 @@ import java.util.List;
 public class Monstre {
 
     public static final int RAYON = 5;
+    
+    // Liste globale pour accéder aux autres monstres (séparation et alerte)
+    public static List<Monstre> tousLesMonstres = new ArrayList<>();
 
     private double x, y;
     private final SteeringBehavior steering;
@@ -20,7 +23,7 @@ public class Monstre {
     private Noeud destination;
 
     private Target target;
-    private double distanceDetection = 150;
+    private double distanceDetection = 50;
 
     private final Automate automate;
 
@@ -28,6 +31,10 @@ public class Monstre {
     private double lastTargetX = -1;
     private double lastTargetY = -1;
     private final double SEUIL_MOUVEMENT = 10.0; // Distance minimum pour justifier un recalcul
+
+    // Variables pour l'alerte
+    private double alerteX = -1;
+    private double alerteY = -1;
 
     // ===================== CONSTRUCTEUR =====================
 
@@ -37,7 +44,7 @@ public class Monstre {
         this.map = map;
         this.steering = new SteeringBehavior();
         this.automate = new Automate(this);
-
+        tousLesMonstres.add(this);
     }
 
     // ===================== UPDATE =====================
@@ -201,6 +208,17 @@ public class Monstre {
         return automate.getEtat();
     }
 
+    public void forcerPoursuite() {
+        this.automate.forcerEtatPoursuite();
+    }
+
+    public void recevoirAlerte(double xPosition, double yPosition, Target t) {
+        this.alerteX = xPosition;
+        this.alerteY = yPosition;
+        this.target = t;
+        this.automate.forcerEtatAlerte();
+    }
+
     public double getX() {
         return x;
     }
@@ -232,21 +250,48 @@ public class Monstre {
 
     public void updatePoursuite() {
         if (target == null) return;
+        
+        applySocialSteering(tousLesMonstres);
+        alerterAutresMonstres(); // Alerte en continu les autres monstres autour pendant la poursuite
+
+        long currentTime = System.currentTimeMillis();
 
         // Calcul de la distance entre la position actuelle de la cible et la dernière position connue
         double distanceCibleBougee = Math.sqrt(Math.pow(target.getX() - lastTargetX, 2)
                 + Math.pow(target.getY() - lastTargetY, 2));
 
-        // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement
-        if (chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) {
+        // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement,
+        // ET uniquement si 500ms se sont écoulées depuis le dernier recalcul pour éviter de lagguer.
+        if ((chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
             recalculerCheminVers((int)target.getX(), (int)target.getY());
 
             // Mise à jour de la dernière position connue
             lastTargetX = target.getX();
             lastTargetY = target.getY();
+            dernierRecalcul = currentTime;
         }
 
         // On appelle le mouvement physique
+        updateMouvement();
+    }
+
+    public void updateAlerte() {
+        applySocialSteering(tousLesMonstres);
+        
+        long currentTime = System.currentTimeMillis();
+
+        // recalcule le chemin si le point d'alerte bouge ou si on a pas de chemin
+        double distanceAlerteBougee = Math.sqrt(Math.pow(alerteX - lastTargetX, 2)
+                + Math.pow(alerteY - lastTargetY, 2));
+
+        // Limitation du recalcul à 1 fois par 500ms maximum
+        if ((chemin.isEmpty() || arrived || distanceAlerteBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
+            recalculerCheminVers((int)alerteX, (int)alerteY);
+            lastTargetX = alerteX;
+            lastTargetY = alerteY;
+            dernierRecalcul = currentTime;
+        }
+
         updateMouvement();
     }
 
@@ -297,4 +342,52 @@ public class Monstre {
         }
     }
 
+    /**
+     * Applique une force de séparation par rapport aux autres monstres
+     * pour éviter qu'ils ne se chevauchent (Social Steering).
+     */
+    public void applySocialSteering(List<Monstre> autresMonstres) {
+        double separationX = 0;
+        double separationY = 0;
+        double minDistance = RAYON * 4; // Distance minimale souhaitée entre les monstres
+        
+        for (Monstre autre : autresMonstres) {
+            if (autre != this) {
+                double dx = x - autre.getX();
+                double dy = y - autre.getY();
+                double dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 0 && dist < minDistance) {
+                    separationX += dx / dist; // Force inverse proportionnelle
+                    separationY += dy / dist;
+                }
+            }
+        }
+        
+        double mag = Math.sqrt(separationX * separationX + separationY * separationY);
+        if (mag > 0) {
+            double separationForce = 0.8; // Modulateur de la force
+            separationX = (separationX / mag) * separationForce;
+            separationY = (separationY / mag) * separationForce;
+            steering.applySeparation(separationX, separationY);
+        }
+    }
+
+    /**
+     * Propage l'alerte aux monstres environnants lorsqu'une cible est détectée.
+     */
+    public void alerterAutresMonstres() {
+        if (target == null) return;
+        double rayonAlerte = 300.0;
+        
+        // On crie sa propre position ou celle de la cible pour alerter
+        for (Monstre autre : tousLesMonstres) {
+            if (autre != this && autre.getEtat() != Automate.Etat.POURSUITE) {
+                double dist = Math.sqrt(Math.pow(autre.getX() - x, 2) + Math.pow(autre.getY() - y, 2));
+                if (dist <= rayonAlerte) {
+                    // Partage la cible, et lui dit d'aller vers nous (ou un peu avant la cible)
+                    autre.recevoirAlerte(target.getX(), target.getY(), target);
+                }
+            }
+        }
+    }
 }

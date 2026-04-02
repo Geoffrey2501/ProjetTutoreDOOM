@@ -26,5 +26,12 @@ public interface NetworkListener {
      * @param playerId L'identifiant du joueur qui part
      */
     void onPlayerLeave(String playerId);
-}
 
+    /**
+     * Appelé lorsqu'un monstre se déplace.
+     * @param monsterId identifiant du monstre
+     * @param x position X
+     * @param y position Y
+     */
+    void onMonsterMove(String monsterId, double x, double y);
+}
