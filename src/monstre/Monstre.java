@@ -32,6 +32,10 @@ public class Monstre {
     private double lastTargetY = -1;
     private final double SEUIL_MOUVEMENT = 10.0; // Distance minimum pour justifier un recalcul
 
+    // Variables pour l'alerte
+    private double alerteX = -1;
+    private double alerteY = -1;
+
     // ===================== CONSTRUCTEUR =====================
 
     public Monstre(double x, double y, Map map) {
@@ -204,6 +208,17 @@ public class Monstre {
         return automate.getEtat();
     }
 
+    public void forcerPoursuite() {
+        this.automate.forcerEtatPoursuite();
+    }
+
+    public void recevoirAlerte(double xPosition, double yPosition, Target t) {
+        this.alerteX = xPosition;
+        this.alerteY = yPosition;
+        this.target = t;
+        this.automate.forcerEtatAlerte();
+    }
+
     public double getX() {
         return x;
     }
@@ -237,6 +252,7 @@ public class Monstre {
         if (target == null) return;
         
         applySocialSteering(tousLesMonstres);
+        alerterAutresMonstres(); // Alerte en continu les autres monstres autour pendant la poursuite
 
         // Calcul de la distance entre la position actuelle de la cible et la dernière position connue
         double distanceCibleBougee = Math.sqrt(Math.pow(target.getX() - lastTargetX, 2)
@@ -252,6 +268,22 @@ public class Monstre {
         }
 
         // On appelle le mouvement physique
+        updateMouvement();
+    }
+
+    public void updateAlerte() {
+        applySocialSteering(tousLesMonstres);
+
+        // recalcule le chemin si le point d'alerte bouge ou si on a pas de chemin
+        double distanceAlerteBougee = Math.sqrt(Math.pow(alerteX - lastTargetX, 2)
+                + Math.pow(alerteY - lastTargetY, 2));
+
+        if (chemin.isEmpty() || arrived || distanceAlerteBougee > SEUIL_MOUVEMENT) {
+            recalculerCheminVers((int)alerteX, (int)alerteY);
+            lastTargetX = alerteX;
+            lastTargetY = alerteY;
+        }
+
         updateMouvement();
     }
 
@@ -339,12 +371,13 @@ public class Monstre {
         if (target == null) return;
         double rayonAlerte = 300.0;
         
+        // On crie sa propre position ou celle de la cible pour alerter
         for (Monstre autre : tousLesMonstres) {
             if (autre != this && autre.getEtat() != Automate.Etat.POURSUITE) {
                 double dist = Math.sqrt(Math.pow(autre.getX() - x, 2) + Math.pow(autre.getY() - y, 2));
                 if (dist <= rayonAlerte) {
-                    autre.setTarget(this.target);
-                    // L'automate passera en POURSUITE à la prochaine update si la cible est partagée
+                    // Partage la cible, et lui dit d'aller vers nous (ou un peu avant la cible)
+                    autre.recevoirAlerte(target.getX(), target.getY(), target);
                 }
             }
         }

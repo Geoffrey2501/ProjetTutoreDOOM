@@ -5,7 +5,9 @@ public class Automate{
     public enum Etat {
         ATTENTE,
         PATROUILLE,
-        POURSUITE
+        POURSUITE,
+
+        ALERTE
     }
 
     private Etat etatActuel = Etat.ATTENTE;
@@ -41,6 +43,10 @@ public class Automate{
             case POURSUITE:
                 updatePoursuite();
                 break;
+
+            case ALERTE:
+                updateAlerte();
+                break;
         }
     }
 
@@ -67,7 +73,8 @@ public class Automate{
     }
 
     private void updatePoursuite() {
-        if (!monstre.cibleDetectee()) {
+        // On ne perd l'aggro que si la cible est vraiment loin (distance d'abandon)
+        if (monstre.getTarget() == null || monstre.getTarget().distanceFrom(monstre.getX(), monstre.getY()) > 350) {
             transitionVers(Etat.ATTENTE);
             return;
         }
@@ -75,7 +82,21 @@ public class Automate{
         monstre.updatePoursuite(); // ta méthode existante
     }
 
-    private void transitionVers(Etat nouvelEtat) {
+    private void updateAlerte() {
+        if (monstre.cibleDetectee()) {
+            transitionVers(Etat.POURSUITE);
+            return;
+        }
+
+        if (monstre.isArrived()) {
+            transitionVers(Etat.ATTENTE);
+            return;
+        }
+
+        monstre.updateAlerte();
+    }
+
+    public void transitionVers(Etat nouvelEtat) {
         if (etatActuel == nouvelEtat) return;
 
         System.out.println("[Automate] Transition: " + etatActuel + " -> " + nouvelEtat);
@@ -94,8 +115,20 @@ public class Automate{
 
         if (nouvelEtat == Etat.POURSUITE) {
             monstre.resetSteering();
-            monstre.alerterAutresMonstres(); // Alerte les autres monstres autour
+            // L'alerte est gérée directement dans updatePoursuite pour être continue
         }
+
+        if (nouvelEtat == Etat.ALERTE) {
+            monstre.resetSteering();
+        }
+    }
+
+    public void forcerEtatPoursuite() {
+        transitionVers(Etat.POURSUITE);
+    }
+
+    public void forcerEtatAlerte() {
+        transitionVers(Etat.ALERTE);
     }
 
     public Etat getEtat() {
