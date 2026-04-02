@@ -94,11 +94,6 @@ public class MinimapRenderer implements GameRenderer {
         // Restaurer complètement le contexte graphique
         g2d.setTransform(oldTransform);
         g2d.setClip(oldClip);
-
-        // Afficher le label
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Arial", Font.BOLD, 12));
-        g2d.drawString("Minimap", minimapX + 5, minimapY + MINIMAP_HEIGHT + 25);
     }
 
     /**

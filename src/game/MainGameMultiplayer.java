@@ -164,8 +164,16 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
                                 double speed = 0.05;
                                 if (sd > 0.1) {
-                                    m.pos[0] += (sdx / sd) * speed;
-                                    m.pos[1] += (sdy / sd) * speed;
+                                    double nextX = m.pos[0] + (sdx / sd) * speed;
+                                    double nextY = m.pos[1] + (sdy / sd) * speed;
+                                    double monsterRadius = 0.3;
+
+                                    if (!collision.isColliding(nextX, m.pos[1], monsterRadius)) {
+                                        m.pos[0] = nextX;
+                                    }
+                                    if (!collision.isColliding(m.pos[0], nextY, monsterRadius)) {
+                                        m.pos[1] = nextY;
+                                    }
                                 }
 
                                 synchronized (monsterSpriteManager) {
