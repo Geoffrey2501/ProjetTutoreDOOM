@@ -11,6 +11,10 @@ import java.util.List;
 public class Renderer {
     private BufferedImage buffer;
 
+    // Couleurs du ciel et du sol
+    private static final Color SKY_COLOR = new Color(135, 206, 235);      // Bleu ciel
+    private static final Color FLOOR_COLOR = new Color(105, 105, 105);    // Gris foncé
+
     public void renderWorld(Graphics g, int width, int height, List<Object[]> objects, Joueur joueur) {
         if (buffer == null || buffer.getWidth() != width || buffer.getHeight() != height) {
             buffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -22,9 +26,12 @@ public class Renderer {
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // Effacer l'écran (Fond)
-        g2d.setColor(Color.BLACK);
-        g2d.fillRect(0, 0, width, height);
+        // Dessiner le ciel en haut et le sol en bas
+        int halfHeight = height / 2;
+        g2d.setColor(SKY_COLOR);
+        g2d.fillRect(0, 0, width, halfHeight);
+        g2d.setColor(FLOOR_COLOR);
+        g2d.fillRect(0, halfHeight, width, height - halfHeight);
 
         double fov = Math.toRadians(GameConfig.FOV);
 
