@@ -21,6 +21,7 @@ public class MinimapRenderer implements GameRenderer {
     private final Joueur joueur;
     private final CollisionStrategy collision;
     private final GameNetworkAdapter network;
+    private final List<Sprite> sprites = new CopyOnWriteArrayList<>();
 
     // Paramètres de zoom et dimensions
     private static final float ZOOM = 5.0f; // pixels par unité de map
@@ -33,6 +34,7 @@ public class MinimapRenderer implements GameRenderer {
     private static final Color FLOOR_COLOR = new Color(30, 30, 30);
     private static final Color PLAYER_COLOR = new Color(0, 255, 0);
     private static final Color DIRECTION_LINE_COLOR = new Color(200, 200, 0);
+    private static final Color SPRITE_COLOR = new Color(255, 255, 0);
 
     private static final Color[] REMOTE_PLAYER_COLORS = {
             new Color(255, 100, 100), new Color(255, 200, 0),
@@ -85,6 +87,9 @@ public class MinimapRenderer implements GameRenderer {
 
         // Dessiner les autres joueurs
         drawRemotePlayers(g2d);
+
+        // Dessiner les sprites
+        drawSprites(g2d);
 
         // Restaurer complètement le contexte graphique
         g2d.setTransform(oldTransform);
@@ -181,15 +186,42 @@ public class MinimapRenderer implements GameRenderer {
         }
     }
 
+    /**
+     * Dessine les sprites sur la minimap
+     */
+    private void drawSprites(Graphics2D g2d) {
+        g2d.setColor(Color.YELLOW);
+        int spriteRadius = Math.max(2, PLAYER_DOT_RADIUS - 1);
 
+        for (Sprite sprite : sprites) {
+            double relX = (sprite.getX() - joueur.getX()) * ZOOM;
+            double relY = (sprite.getY() - joueur.getY()) * ZOOM;
+
+            // Vérifier que c'est dans la zone de la minimap
+            if (Math.abs(relX) < MINIMAP_WIDTH && Math.abs(relY) < MINIMAP_HEIGHT) {
+                g2d.fillOval((int) relX - spriteRadius, (int) relY - spriteRadius,
+                        spriteRadius * 2, spriteRadius * 2);
+            }
+        }
+    }
+
+    /**
+     * Ajouter un sprite sur la minimap
+     * @param sprite le sprite
+     */
     @Override
     public void addSprite(Sprite sprite) {
-        // La minimap n'affiche pas les sprites pour le moment
+        if (sprite != null && !sprites.contains(sprite)) {
+            sprites.add(sprite);
+        }
     }
 
+    /**
+     * Supprimer le sprite
+     * @param sprite
+     */
     @Override
     public void removeSprite(Sprite sprite) {
-        // La minimap n'affiche pas les sprites pour le moment
+        sprites.remove(sprite);
     }
 }
-

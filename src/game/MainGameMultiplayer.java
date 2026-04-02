@@ -93,7 +93,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         network.start();
 
         spriteManager = new PlayerSpriteManager(renderer, network);
-        monsterSpriteManager = new MonsterSpriteManager(renderer);
+        monsterSpriteManager = new MonsterSpriteManager(renderer, minimapRenderer);
 
         boolean isHost = (serverIp == null || serverIp.isEmpty() || serverPort <= 0);
 
