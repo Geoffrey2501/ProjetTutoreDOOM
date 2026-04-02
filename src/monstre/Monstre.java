@@ -254,17 +254,21 @@ public class Monstre {
         applySocialSteering(tousLesMonstres);
         alerterAutresMonstres(); // Alerte en continu les autres monstres autour pendant la poursuite
 
+        long currentTime = System.currentTimeMillis();
+
         // Calcul de la distance entre la position actuelle de la cible et la dernière position connue
         double distanceCibleBougee = Math.sqrt(Math.pow(target.getX() - lastTargetX, 2)
                 + Math.pow(target.getY() - lastTargetY, 2));
 
-        // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement
-        if (chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) {
+        // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement,
+        // ET uniquement si 500ms se sont écoulées depuis le dernier recalcul pour éviter de lagguer.
+        if ((chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
             recalculerCheminVers((int)target.getX(), (int)target.getY());
 
             // Mise à jour de la dernière position connue
             lastTargetX = target.getX();
             lastTargetY = target.getY();
+            dernierRecalcul = currentTime;
         }
 
         // On appelle le mouvement physique
@@ -273,15 +277,19 @@ public class Monstre {
 
     public void updateAlerte() {
         applySocialSteering(tousLesMonstres);
+        
+        long currentTime = System.currentTimeMillis();
 
         // recalcule le chemin si le point d'alerte bouge ou si on a pas de chemin
         double distanceAlerteBougee = Math.sqrt(Math.pow(alerteX - lastTargetX, 2)
                 + Math.pow(alerteY - lastTargetY, 2));
 
-        if (chemin.isEmpty() || arrived || distanceAlerteBougee > SEUIL_MOUVEMENT) {
+        // Limitation du recalcul à 1 fois par 500ms maximum
+        if ((chemin.isEmpty() || arrived || distanceAlerteBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
             recalculerCheminVers((int)alerteX, (int)alerteY);
             lastTargetX = alerteX;
             lastTargetY = alerteY;
+            dernierRecalcul = currentTime;
         }
 
         updateMouvement();
