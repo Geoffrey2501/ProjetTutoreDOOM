@@ -11,6 +11,7 @@ import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
 import moteur_graphique.CollisionStrategy;
 import moteur_graphique.GameRenderer;
+import moteur_graphique.MinimapRenderer;
 import moteur_graphique.Window;
 import moteur_graphique.raycasting.CollisionRaycasting;
 import moteur_graphique.raycasting.MapBool;
@@ -76,17 +77,23 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         window.setRenderer(renderer);
 
+        // Créer l'adaptateur réseau d'abord
+        network = new GameNetworkAdapter(playerId, "localhost", port);
+        network.setLocalPlayer(joueur);
+        network.setNetworkListener(this);
+
+        // Puis créer la minimap avec le network
+        GameRenderer minimapRenderer = new MinimapRenderer(joueur, collision, network);
+        window.setMinimapRenderer(minimapRenderer);
+
         window.addInputListener(input);
 
         mouseCaptureHandler = new MouseGestion(window, input);
 
-        network = new GameNetworkAdapter(playerId, "localhost", port);
-        network.setLocalPlayer(joueur);
-        network.setNetworkListener(this);
         network.start();
 
         spriteManager = new PlayerSpriteManager(renderer, network);
-        monsterSpriteManager = new MonsterSpriteManager(renderer);
+        monsterSpriteManager = new MonsterSpriteManager(renderer, minimapRenderer);
 
         boolean isHost = (serverIp == null || serverIp.isEmpty() || serverPort <= 0);
 
@@ -157,8 +164,16 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
                                 double speed = 0.05;
                                 if (sd > 0.1) {
-                                    m.pos[0] += (sdx / sd) * speed;
-                                    m.pos[1] += (sdy / sd) * speed;
+                                    double nextX = m.pos[0] + (sdx / sd) * speed;
+                                    double nextY = m.pos[1] + (sdy / sd) * speed;
+                                    double monsterRadius = 0.3;
+
+                                    if (!collision.isColliding(nextX, m.pos[1], monsterRadius)) {
+                                        m.pos[0] = nextX;
+                                    }
+                                    if (!collision.isColliding(m.pos[0], nextY, monsterRadius)) {
+                                        m.pos[1] = nextY;
+                                    }
                                 }
 
                                 synchronized (monsterSpriteManager) {
@@ -181,6 +196,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         }
 
         window.addLogMessage("Connecté en tant que " + playerId, Color.GREEN);
+        window.addLogMessage("TAB: Afficher joueurs | FPS en haut à gauche", Color.YELLOW);
     }
 
     /**

@@ -12,11 +12,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MonsterSpriteManager {
 
     private final Map<String, Sprite> monsterSprites;
-    private final GameRenderer renderer;
+    private final GameRenderer[] renderers;
 
-    public MonsterSpriteManager(GameRenderer renderer) {
+    public MonsterSpriteManager(GameRenderer... renderers) {
         this.monsterSprites = new ConcurrentHashMap<>();
-        this.renderer = renderer;
+        this.renderers = renderers;
     }
 
     /**
@@ -29,7 +29,11 @@ public class MonsterSpriteManager {
                 // Création du sprite de monstre (en supposant qu'il utilise jonesy.png comme texture temporaire ou autre chose)
                 sprite = new Sprite(x, y, "assets/sprites/Dark_Jonesy.png", "Monstre " + monsterId);
                 monsterSprites.put(monsterId, sprite);
-                renderer.addSprite(sprite);
+                for (GameRenderer renderer : renderers) {
+                    if (renderer != null) {
+                        renderer.addSprite(sprite);
+                    }
+                }
             } else {
                 sprite.setX(x);
                 sprite.setY(y);
@@ -43,7 +47,11 @@ public class MonsterSpriteManager {
     public void clear() {
         synchronized (monsterSprites) {
             for (Sprite sprite : monsterSprites.values()) {
-                renderer.removeSprite(sprite);
+                for (GameRenderer renderer : renderers) {
+                    if (renderer != null) {
+                        renderer.removeSprite(sprite);
+                    }
+                }
             }
             monsterSprites.clear();
         }
