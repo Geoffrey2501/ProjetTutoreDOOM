@@ -185,7 +185,7 @@ public class MinimapRenderer implements GameRenderer {
      * Dessine les sprites sur la minimap
      */
     private void drawSprites(Graphics2D g2d) {
-        g2d.setColor(Color.YELLOW);
+        g2d.setColor(SPRITE_COLOR);
         int spriteRadius = Math.max(2, PLAYER_DOT_RADIUS - 1);
 
         for (Sprite sprite : sprites) {
