@@ -5,10 +5,10 @@ package monstre;
  * pour des déplacements naturels et fluides.
  */
 public class SteeringBehavior {
-    private double maxVelocity = 3.0;
-    private double maxForce = 0.3;
-    private double arrivalRadius = 5.0;
-    private double slowingRadius = 30.0;
+    private double maxVelocity = 0.05;
+    private double maxForce = 0.05;
+    private double arrivalRadius = 0.5;
+    private double slowingRadius = 2.0;
 
     private double velocityX = 0;
     private double velocityY = 0;
@@ -47,7 +47,7 @@ public class SteeringBehavior {
         double magnitude = Math.sqrt(desiredX * desiredX + desiredY * desiredY);
 
         // Si très proche, aller directement vers la cible
-        if (magnitude < 5) {
+        if (magnitude < 0.5) {
             velocityX = desiredX;
             velocityY = desiredY;
             return;

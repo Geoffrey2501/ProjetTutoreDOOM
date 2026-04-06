@@ -8,7 +8,6 @@ import java.util.*;
 import java.util.List;
 
 import monstre.Monstre;
-import monstre.Map;
 import monstre.Target;
 
 import moteur_graphique.BSP.BSPParcours;
@@ -104,12 +103,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         if (useBSP) {
                 if (isHost) {
-                Map monstreMap = new Map(600, 600); // Create a map for the monsters
-                new monstre.RRT(monstreMap); // Initialize the RRT static map
                 List<Monstre> monsters = Arrays.asList(
-                    new Monstre(GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5, monstreMap),
-                    new Monstre(GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5, monstreMap),
-                    new Monstre(GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5, monstreMap)
+                    new Monstre(10.0, 10.0, collision),
+                    new Monstre(12.0, 10.0, collision),
+                    new Monstre(10.0, 12.0, collision)
                 );
 
                 // Initialize a temporary target using the player's position
@@ -118,7 +115,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
                 for (Monstre m : monsters) {
                     m.setTarget(playerTarget);
                     // Initialiser les points de patrouille pour que l'automate puisse passer en PATROUILLE
-                    m.setPointsPatrouille(new monstre.Noeud((int)m.getX(), (int)m.getY()), new monstre.Noeud((int)m.getX() + 50, (int)m.getY() + 50));
+                    m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() + 5.0, m.getY() + 5.0));
                     monsterSpriteManager.onMonsterMove(String.valueOf(m.hashCode()), m.getX(), m.getY());
                 }
 
