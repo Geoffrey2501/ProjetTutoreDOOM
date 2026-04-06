@@ -6,6 +6,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.*;
 import java.util.List;
+
+import monstre.Monstre;
+import monstre.Map;
+import monstre.Target;
+
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -98,93 +103,40 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         boolean isHost = (serverIp == null || serverIp.isEmpty() || serverPort <= 0);
 
         if (useBSP) {
-            if (isHost) {
-                class MonsterState {
-                    String id;
-                    double[] pos;
-                    MonsterState(String id, double x, double y) {
-                        this.id = id;
-                        this.pos = new double[]{x, y};
-                    }
-                }
-
-                List<MonsterState> monsters = Arrays.asList(
-                    new MonsterState("DarkJonesy_1", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5),
-                    new MonsterState("DarkJonesy_2", GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5),
-                    new MonsterState("DarkJonesy_3", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5)
+                if (isHost) {
+                Map monstreMap = new Map(600, 600); // Create a map for the monsters
+                new monstre.RRT(monstreMap); // Initialize the RRT static map
+                List<Monstre> monsters = Arrays.asList(
+                    new Monstre(GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5, monstreMap),
+                    new Monstre(GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5, monstreMap),
+                    new Monstre(GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5, monstreMap)
                 );
 
-                for (MonsterState m : monsters) {
-                    monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
+                // Initialize a temporary target using the player's position
+                Target playerTarget = new Target(joueur);
+
+                for (Monstre m : monsters) {
+                    m.setTarget(playerTarget);
+                    // Initialiser les points de patrouille pour que l'automate puisse passer en PATROUILLE
+                    m.setPointsPatrouille(new monstre.Noeud((int)m.getX(), (int)m.getY()), new monstre.Noeud((int)m.getX() + 50, (int)m.getY() + 50));
+                    monsterSpriteManager.onMonsterMove(String.valueOf(m.hashCode()), m.getX(), m.getY());
                 }
 
                 monsterThread = new Thread(() -> {
-                    while (!Thread.currentThread().isInterrupted()) {
-                        try {
-                            Thread.sleep(50);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-
-                        for (MonsterState m : monsters) {
-                            double minDist = Double.MAX_VALUE;
-                            Joueur target = null;
-
-                            List<Joueur> allPlayers = new ArrayList<>();
-                            allPlayers.add(joueur);
-                            allPlayers.addAll(network.getRemotePlayers().values());
-
-                            for (Joueur p : allPlayers) {
-                                // joueur local est toujours défini, les autres doivent l'être
-                                if (p == joueur || p.isPositionInitialized()) {
-                                    double dx = p.getX() - m.pos[0];
-                                    double dy = p.getY() - m.pos[1];
-                                    double d = Math.sqrt(dx * dx + dy * dy);
-                                    if (d < minDist) {
-                                        minDist = d;
-                                        target = p;
-                                    }
-                                }
+                    try {
+                        while (!Thread.currentThread().isInterrupted()) {
+                            for (Monstre m : monsters) {
+                                m.update();
+                                String monsterId = String.valueOf(m.hashCode());
+                                monsterSpriteManager.onMonsterMove(monsterId, m.getX(), m.getY());
+                                network.sendMonsterPosition(monsterId, m.getX(), m.getY());
                             }
-
-                            if (target != null && minDist > 0.5) {
-                                // Calcul de l'encerclement (système de slots d'attaque)
-                                int maxMonsters = monsters.size();
-                                int monsterIndex = monsters.indexOf(m);
-                                double angleSlot = (2 * Math.PI / maxMonsters) * monsterIndex;
-                                double distanceEncerclement = 2.0;
-
-                                double slotX = target.getX() + Math.cos(angleSlot) * distanceEncerclement;
-                                double slotY = target.getY() + Math.sin(angleSlot) * distanceEncerclement;
-
-                                double sdx = slotX - m.pos[0];
-                                double sdy = slotY - m.pos[1];
-                                double sd = Math.sqrt(sdx * sdx + sdy * sdy);
-
-                                double speed = 0.05;
-                                if (sd > 0.1) {
-                                    double nextX = m.pos[0] + (sdx / sd) * speed;
-                                    double nextY = m.pos[1] + (sdy / sd) * speed;
-                                    double monsterRadius = 0.3;
-
-                                    if (!collision.isColliding(nextX, m.pos[1], monsterRadius)) {
-                                        m.pos[0] = nextX;
-                                    }
-                                    if (!collision.isColliding(m.pos[0], nextY, monsterRadius)) {
-                                        m.pos[1] = nextY;
-                                    }
-                                }
-
-                                synchronized (monsterSpriteManager) {
-                                    monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
-                                }
-                                network.sendMonsterPosition(m.id, m.pos[0], m.pos[1]);
-                            }
+                            Thread.sleep(50); // Mettre à jour à ~20 FPS (50ms)
                         }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
                 });
-                monsterThread.setDaemon(true);
                 monsterThread.start();
             }
         }
