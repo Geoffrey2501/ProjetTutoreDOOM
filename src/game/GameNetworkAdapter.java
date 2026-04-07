@@ -14,6 +14,8 @@ public class GameNetworkAdapter {
     private final Map<String, Joueur> remotePlayers;
     private final Set<String> notifiedPlayers; // Pour éviter les notifications en double
     private NetworkListener listener;
+    private volatile String monsterHostId = null;
+    private final Map<String, double[]> lastMonsterPositions = new ConcurrentHashMap<>();
 
     /**
     * Constructeur de l'adaptateur réseau de jeu
@@ -137,6 +139,7 @@ public class GameNetworkAdapter {
      * Envoyer la position d'un monstre à tous les pairs
      */
     public void sendMonsterPosition(String monsterId, double x, double y) {
+        lastMonsterPositions.put(monsterId, new double[]{x, y});
         String message = "MONSTER_MOVE:" + monsterId + ":" + x + "," + y;
         serveur.broadcastToPeers(message);
     }
@@ -150,6 +153,7 @@ public class GameNetworkAdapter {
             if (parts.length >= 2) {
                 double x = Double.parseDouble(parts[0]);
                 double y = Double.parseDouble(parts[1]);
+                lastMonsterPositions.put(monsterId, new double[]{x, y});
                 if (listener != null) {
                     listener.onMonsterMove(monsterId, x, y);
                 }
@@ -157,6 +161,29 @@ public class GameNetworkAdapter {
         } catch (NumberFormatException e) {
             // Ignorer l'erreur
         }
+    }
+
+    /**
+     * Annonce que ce nœud est l'hôte des monstres à tous les pairs.
+     */
+    public void announceMonsterHost() {
+        monsterHostId = serveur.getNodeId();
+        serveur.broadcastToPeers("MONSTER_HOST:" + monsterHostId);
+    }
+
+    /**
+     * Appelé quand on reçoit une annonce d'hôte monstre d'un pair.
+     */
+    public void onMonsterHostReceived(String hostId) {
+        monsterHostId = hostId;
+    }
+
+    public String getMonsterHostId() {
+        return monsterHostId;
+    }
+
+    public Map<String, double[]> getLastMonsterPositions() {
+        return new ConcurrentHashMap<>(lastMonsterPositions);
     }
 
     /**

@@ -65,6 +65,8 @@ public class ServeurGame extends Serveur {
             processGameMoveMessage(message, sender);
         } else if (message.startsWith("MONSTER_MOVE:")) {
             processMonsterMoveMessage(message, sender);
+        } else if (message.startsWith("MONSTER_HOST:")) {
+            adapter.onMonsterHostReceived(message.substring(13));
         } else {
             super.processMessageFromPeer(message, sender);
         }

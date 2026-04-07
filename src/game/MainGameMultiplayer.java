@@ -36,10 +36,21 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     private final MonsterSpriteManager monsterSpriteManager;
     private final GameLoop gameLoop;
 
-    private Thread monsterThread;
+    private volatile Thread monsterThread;
+    private volatile List<MonsterState> monsters;
+    private boolean isBSPMode;
 
     // === Réseau ===
     private final GameNetworkAdapter network;
+
+    private static class MonsterState {
+        String id;
+        double[] pos;
+        MonsterState(String id, double x, double y) {
+            this.id = id;
+            this.pos = new double[]{x, y};
+        }
+    }
 
     /**
      * Constructeur du jeu multijoueur.
@@ -95,98 +106,21 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         spriteManager = new PlayerSpriteManager(renderer, network);
         monsterSpriteManager = new MonsterSpriteManager(renderer, minimapRenderer);
 
+        isBSPMode = useBSP;
         boolean isHost = (serverIp == null || serverIp.isEmpty() || serverPort <= 0);
 
-        if (useBSP) {
-            if (isHost) {
-                class MonsterState {
-                    String id;
-                    double[] pos;
-                    MonsterState(String id, double x, double y) {
-                        this.id = id;
-                        this.pos = new double[]{x, y};
-                    }
-                }
-
-                List<MonsterState> monsters = Arrays.asList(
-                    new MonsterState("DarkJonesy_1", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5),
-                    new MonsterState("DarkJonesy_2", GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5),
-                    new MonsterState("DarkJonesy_3", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5)
-                );
-
-                for (MonsterState m : monsters) {
-                    monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
-                }
-
-                monsterThread = new Thread(() -> {
-                    while (!Thread.currentThread().isInterrupted()) {
-                        try {
-                            Thread.sleep(50);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-
-                        for (MonsterState m : monsters) {
-                            double minDist = Double.MAX_VALUE;
-                            Joueur target = null;
-
-                            List<Joueur> allPlayers = new ArrayList<>();
-                            allPlayers.add(joueur);
-                            allPlayers.addAll(network.getRemotePlayers().values());
-
-                            for (Joueur p : allPlayers) {
-                                // joueur local est toujours défini, les autres doivent l'être
-                                if (p == joueur || p.isPositionInitialized()) {
-                                    double dx = p.getX() - m.pos[0];
-                                    double dy = p.getY() - m.pos[1];
-                                    double d = Math.sqrt(dx * dx + dy * dy);
-                                    if (d < minDist) {
-                                        minDist = d;
-                                        target = p;
-                                    }
-                                }
-                            }
-
-                            if (target != null && minDist > 0.5) {
-                                // Calcul de l'encerclement (système de slots d'attaque)
-                                int maxMonsters = monsters.size();
-                                int monsterIndex = monsters.indexOf(m);
-                                double angleSlot = (2 * Math.PI / maxMonsters) * monsterIndex;
-                                double distanceEncerclement = 2.0;
-
-                                double slotX = target.getX() + Math.cos(angleSlot) * distanceEncerclement;
-                                double slotY = target.getY() + Math.sin(angleSlot) * distanceEncerclement;
-
-                                double sdx = slotX - m.pos[0];
-                                double sdy = slotY - m.pos[1];
-                                double sd = Math.sqrt(sdx * sdx + sdy * sdy);
-
-                                double speed = 0.05;
-                                if (sd > 0.1) {
-                                    double nextX = m.pos[0] + (sdx / sd) * speed;
-                                    double nextY = m.pos[1] + (sdy / sd) * speed;
-                                    double monsterRadius = 0.3;
-
-                                    if (!collision.isColliding(nextX, m.pos[1], monsterRadius)) {
-                                        m.pos[0] = nextX;
-                                    }
-                                    if (!collision.isColliding(m.pos[0], nextY, monsterRadius)) {
-                                        m.pos[1] = nextY;
-                                    }
-                                }
-
-                                synchronized (monsterSpriteManager) {
-                                    monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
-                                }
-                                network.sendMonsterPosition(m.id, m.pos[0], m.pos[1]);
-                            }
-                        }
-                    }
-                });
-                monsterThread.setDaemon(true);
-                monsterThread.start();
+        if (useBSP && isHost) {
+            List<MonsterState> initialMonsters = Arrays.asList(
+                new MonsterState("DarkJonesy_1", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5),
+                new MonsterState("DarkJonesy_2", GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5),
+                new MonsterState("DarkJonesy_3", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5)
+            );
+            for (MonsterState m : initialMonsters) {
+                monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
+                network.sendMonsterPosition(m.id, m.pos[0], m.pos[1]);
             }
+            network.announceMonsterHost();
+            startMonsterThread(initialMonsters);
         }
 
         gameLoop = new GameLoop(this);
@@ -342,6 +276,10 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
             window.addLogMessage(playerId + " a rejoint la partie", Color.GREEN);
         }
         network.sendPlayerPositionNow();
+        // Si on est l'hôte des monstres, on ré-annonce pour que le nouveau joueur le sache
+        if (isBSPMode && joueur.getId().equals(network.getMonsterHostId())) {
+            network.announceMonsterHost();
+        }
     }
 
     @Override
@@ -349,6 +287,100 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         if (spriteManager.onPlayerLeave(playerId)) {
             window.addLogMessage(playerId + " a quitté la partie", Color.RED);
         }
+        // Host migration : si l'hôte des monstres vient de partir, on élit un nouveau
+        if (isBSPMode && playerId.equals(network.getMonsterHostId())) {
+            electNewMonsterHost();
+        }
+    }
+
+    private void electNewMonsterHost() {
+        List<String> allIds = new ArrayList<>();
+        allIds.add(joueur.getId());
+        allIds.addAll(network.getRemotePlayers().keySet());
+        Collections.sort(allIds);
+
+        String elected = allIds.get(0);
+        if (elected.equals(joueur.getId())) {
+            Map<String, double[]> lastPos = network.getLastMonsterPositions();
+            List<MonsterState> resumedMonsters = new ArrayList<>();
+            for (Map.Entry<String, double[]> entry : lastPos.entrySet()) {
+                resumedMonsters.add(new MonsterState(entry.getKey(), entry.getValue()[0], entry.getValue()[1]));
+            }
+            network.announceMonsterHost();
+            startMonsterThread(resumedMonsters);
+            window.addLogMessage("Vous êtes maintenant l'hôte des monstres", Color.YELLOW);
+        }
+    }
+
+    private void startMonsterThread(List<MonsterState> monsterList) {
+        monsters = monsterList;
+        if (monsterThread != null) {
+            monsterThread.interrupt();
+        }
+        monsterThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+
+                for (MonsterState m : monsters) {
+                    double minDist = Double.MAX_VALUE;
+                    Joueur target = null;
+
+                    List<Joueur> allPlayers = new ArrayList<>();
+                    allPlayers.add(joueur);
+                    allPlayers.addAll(network.getRemotePlayers().values());
+
+                    for (Joueur p : allPlayers) {
+                        if (p == joueur || p.isPositionInitialized()) {
+                            double dx = p.getX() - m.pos[0];
+                            double dy = p.getY() - m.pos[1];
+                            double d = Math.sqrt(dx * dx + dy * dy);
+                            if (d < minDist) {
+                                minDist = d;
+                                target = p;
+                            }
+                        }
+                    }
+
+                    if (target != null && minDist > 0.5) {
+                        int maxMonsters = monsters.size();
+                        int monsterIndex = monsters.indexOf(m);
+                        double angleSlot = (2 * Math.PI / maxMonsters) * monsterIndex;
+                        double distanceEncerclement = 2.0;
+
+                        double slotX = target.getX() + Math.cos(angleSlot) * distanceEncerclement;
+                        double slotY = target.getY() + Math.sin(angleSlot) * distanceEncerclement;
+
+                        double sdx = slotX - m.pos[0];
+                        double sdy = slotY - m.pos[1];
+                        double sd = Math.sqrt(sdx * sdx + sdy * sdy);
+
+                        double speed = 0.05;
+                        if (sd > 0.1) {
+                            double nextX = m.pos[0] + (sdx / sd) * speed;
+                            double nextY = m.pos[1] + (sdy / sd) * speed;
+                            double monsterRadius = 0.3;
+
+                            if (!collision.isColliding(nextX, m.pos[1], monsterRadius)) {
+                                m.pos[0] = nextX;
+                            }
+                            if (!collision.isColliding(m.pos[0], nextY, monsterRadius)) {
+                                m.pos[1] = nextY;
+                            }
+                        }
+
+                        monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
+                        network.sendMonsterPosition(m.id, m.pos[0], m.pos[1]);
+                    }
+                }
+            }
+        });
+        monsterThread.setDaemon(true);
+        monsterThread.start();
     }
 
     @Override
