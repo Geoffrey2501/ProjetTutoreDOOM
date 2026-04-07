@@ -123,6 +123,21 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
                     try {
                         while (!Thread.currentThread().isInterrupted()) {
                             for (Monstre m : monsters) {
+                                Joueur closestPlayer = joueur;
+                                double minDistanceSq = Math.pow(joueur.getX() - m.getX(), 2) + Math.pow(joueur.getY() - m.getY(), 2);
+
+                                for (Joueur remote : network.getRemotePlayers().values()) {
+                                    double remoteDistSq = Math.pow(remote.getX() - m.getX(), 2) + Math.pow(remote.getY() - m.getY(), 2);
+                                    if (remoteDistSq < minDistanceSq) {
+                                        minDistanceSq = remoteDistSq;
+                                        closestPlayer = remote;
+                                    }
+                                }
+
+                                if (m.getTarget() == null || !m.getTarget().getId().equals(closestPlayer.getId())) {
+                                    m.setTarget(new Target(closestPlayer));
+                                }
+
                                 m.update();
                                 String monsterId = String.valueOf(m.hashCode());
                                 monsterSpriteManager.onMonsterMove(monsterId, m.getX(), m.getY());
