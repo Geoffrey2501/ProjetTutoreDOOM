@@ -29,69 +29,44 @@ public class BSPParcours implements GameRenderer {
         FilledScreen filledScreen = new FilledScreen(width);
         WallCalcul wallCalcul = new WallCalcul();
 
-        // On stocke des couples [Objet, MurOriginal] pour savoir où insérer les sprites
-        // Objet est soit un Sprite, soit un FourPoints
-        List<Object[]> orderedItems = new ArrayList<>();
+        List<FourPoints> wallItems = new ArrayList<>();
 
         // 1. On récupère les murs visibles en Front-to-Back
         Mur m = frontToBack.getNextWall();
-        while(m != null && !filledScreen.isFull()) {
+        while (m != null && !filledScreen.isFull()) {
             FourPoints points = wallCalcul.getFourPoints(m, joueur.getX(), joueur.getY(), FOV, joueur.getAngle(), width, height);
-            if(points != null) {
+            if (points != null) {
                 List<FourPoints> segments = filledScreen.add(points);
                 if (segments != null) {
-                    for (FourPoints seg : segments) {
-                        orderedItems.add(new Object[]{seg, m}); // On garde la réf au mur original
-                    }
+                    wallItems.addAll(segments);
                 }
             }
             m = frontToBack.getNextWall();
         }
 
-        // 2. On insère les sprites dynamiquement dans la liste
-        double jX = joueur.getX();
-        double jY = joueur.getY();
-
-        // On trie d'abord les sprites par distance (proche en premier pour l'insertion FTB)
-        List<Sprite> sortedSprites = new ArrayList<>(sprites);
-        sortedSprites.sort((b, a) -> Double.compare(
-                Math.pow(a.getX()-jX, 2) + Math.pow(a.getY()-jY, 2),
-                Math.pow(b.getX()-jX, 2) + Math.pow(b.getY()-jY, 2)
-        ));
-
-        for (Sprite s : sortedSprites) {
-            int insertIndex = 0; // Par défaut, on le met au début (le plus proche)
-
-            for (int i = 0; i < orderedItems.size(); i++) {
-                Mur wallRef = (Mur) orderedItems.get(i)[1];
-                if (wallRef != null) {
-                    int sideS = getSide(wallRef, s.getX(), s.getY());
-                    int sideJ = getSide(wallRef, joueur.getX(), joueur.getY());
-
-                    // Si le sprite et le joueur sont de côtés OPPOSÉS,
-                    // le mur partitionne l'espace entre eux.
-                    // Le sprite est donc DERRIÈRE ce mur (en FTB).
-                    if (sideS != sideJ && sideS != 0 && sideJ != 0) {
-                        insertIndex = i + 1; // On décale le sprite derrière ce mur
-                    }
-                }
+        // 2. Construire le z-buffer : pour chaque colonne écran, on stocke la profondeur caméra
+        //    du mur le plus proche. Interpolation perspective-correcte (1/z).
+        double[] zBuffer = new double[width];
+        java.util.Arrays.fill(zBuffer, Double.MAX_VALUE);
+        for (FourPoints fp : wallItems) {
+            int xLeft  = (int) Math.max(0, fp.x0);
+            int xRight = (int) Math.min(width - 1, fp.x2);
+            double spanWidth = fp.x2 - fp.x0;
+            if (spanWidth <= 0) continue;
+            double invCzL = 1.0 / fp.cz0;
+            double invCzR = 1.0 / fp.cz1;
+            for (int x = xLeft; x <= xRight; x++) {
+                double t  = (x - fp.x0) / spanWidth;
+                double cz = 1.0 / (invCzL + t * (invCzR - invCzL));
+                if (cz < zBuffer[x]) zBuffer[x] = cz;
             }
-            orderedItems.add(insertIndex, new Object[]{s, null});
         }
 
-        //On inverse la liste
-        java.util.Collections.reverse(orderedItems);
+        // 3. On inverse la liste pour le dessin Back-to-Front (algorithme du peintre)
+        java.util.Collections.reverse(wallItems);
 
-        //plus qu'a dessiner, le culling sera fait automatiquement par l'ordre Back-to-Front
-        renderer.renderWorld(g, width, height, orderedItems, joueur);
-    }
-
-    private int getSide(Mur wall, double px, double py) {
-        double epsilon = 1e-5;
-        double res = (wall.x1 - wall.x0) * (py - wall.y0) - (wall.y1 - wall.y0) * (px - wall.x0);
-        if (res > epsilon) return 1;
-        if (res < -epsilon) return -1;
-        return 0; // Sur la ligne
+        // 4. Rendu : murs en Back-to-Front, sprites clippés colonne par colonne via le z-buffer
+        renderer.renderWorld(g, width, height, wallItems, new ArrayList<>(sprites), joueur, zBuffer);
     }
 
 

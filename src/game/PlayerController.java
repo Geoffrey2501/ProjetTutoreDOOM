@@ -31,7 +31,7 @@ public class PlayerController {
      * @return true si le joueur a bougé ou tourné
      */
     public boolean update(double delta) {
-        double moveSpeed = GameConfig.MOVE_SPEED * delta;
+        double moveSpeed = GameConfig.MOVE_SPEED * delta * (input.isSprint() ? 2.0 : 1.0);
         double rotSpeed = GameConfig.ROTATION_SPEED * delta;
 
         boolean moved = handleMovement(moveSpeed);

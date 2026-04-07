@@ -144,8 +144,8 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
     public void update(double delta) {
         mouseCaptureHandler.update();
 
-        double moveSpeed = 1.5 * delta;
-        double rotSpeed = 2.0 * delta;
+        double moveSpeed = GameConfig.MOVE_SPEED * delta * (input.isSprint() ? 2.0 : 1.0);
+        double rotSpeed = GameConfig.ROTATION_SPEED * delta;
 
         boolean moved = handleMovement(moveSpeed);
         moved |= handleKeyboardRotation(rotSpeed);

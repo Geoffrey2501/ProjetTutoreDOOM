@@ -92,11 +92,17 @@ public class WallCalcul {
 
         // Retourner les 4 points dans le bon ordre pour former un polygone
         // Ordre : haut-gauche, bas-gauche, bas-droite, haut-droite
+        FourPoints fp;
         if (sx0 < sx1) {
-            return new FourPoints(sx0, yTop0, sx0, yBottom0, sx1, yBottom1, sx1, yTop1);
+            fp = new FourPoints(sx0, yTop0, sx0, yBottom0, sx1, yBottom1, sx1, yTop1);
+            fp.cz0 = z_start;
+            fp.cz1 = z_end;
         } else {
-            return new FourPoints(sx1, yTop1, sx1, yBottom1, sx0, yBottom0, sx0, yTop0);
+            fp = new FourPoints(sx1, yTop1, sx1, yBottom1, sx0, yBottom0, sx0, yTop0);
+            fp.cz0 = z_start;
+            fp.cz1 = z_end;
         }
+        return fp;
     }
 
     /**
@@ -157,6 +163,9 @@ public class WallCalcul {
         }
 
         // Reconstruire les polygones (FourPoints) pour chaque morceau visible
+        double invCzLeft  = 1.0 / wall.cz0;
+        double invCzRight = 1.0 / wall.cz1;
+
         for (double[] span : visibleSpans) {
             double vx0 = span[0];
             double vx1 = span[1];
@@ -179,12 +188,16 @@ public class WallCalcul {
             double newYBottom1 = wall.y1 + t1 * (wall.y2 - wall.y1);    // Nouveau Bas-Droite
 
             // On ajoute ce nouveau sous-mur à rendre
-            result.add(new FourPoints(
+            FourPoints sub = new FourPoints(
                     vx0, newYTop0,       // Point 0: Haut-gauche
                     vx0, newYBottom0,    // Point 1: Bas-gauche
                     vx1, newYBottom1,    // Point 2: Bas-droite
                     vx1, newYTop1        // Point 3: Haut-droite
-            ));
+            );
+            // Interpolation perspective-correcte (1/z) de la profondeur caméra
+            sub.cz0 = 1.0 / (invCzLeft + t0 * (invCzRight - invCzLeft));
+            sub.cz1 = 1.0 / (invCzLeft + t1 * (invCzRight - invCzLeft));
+            result.add(sub);
         }
 
         return result;

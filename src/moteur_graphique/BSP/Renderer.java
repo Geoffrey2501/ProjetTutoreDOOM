@@ -11,43 +11,45 @@ import java.util.List;
 public class Renderer {
     private BufferedImage buffer;
 
-    // Couleurs du ciel et du sol
-    private static final Color SKY_COLOR = new Color(135, 206, 235);      // Bleu ciel
-    private static final Color FLOOR_COLOR = new Color(105, 105, 105);    // Gris foncé
+    private static final Color SKY_COLOR   = new Color(135, 206, 235);
+    private static final Color FLOOR_COLOR = new Color(105, 105, 105);
 
-    public void renderWorld(Graphics g, int width, int height, List<Object[]> objects, Joueur joueur) {
+    public void renderWorld(Graphics g, int width, int height,
+                            List<FourPoints> walls, List<Sprite> sprites,
+                            Joueur joueur, double[] zBuffer) {
         if (buffer == null || buffer.getWidth() != width || buffer.getHeight() != height) {
             buffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         }
 
         Graphics2D g2d = buffer.createGraphics();
-
-        // 2. Qualité d'image : On active l'anti-aliasing et l'interpolation pour les objets lointains
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // Dessiner le ciel en haut et le sol en bas
+        // Ciel et sol
         int halfHeight = height / 2;
         g2d.setColor(SKY_COLOR);
         g2d.fillRect(0, 0, width, halfHeight);
         g2d.setColor(FLOOR_COLOR);
         g2d.fillRect(0, halfHeight, width, height - halfHeight);
 
+        // Murs (Back-to-Front, algorithme du peintre)
+        for (FourPoints fp : walls) {
+            drawWall(g2d, fp);
+        }
+
+        // Sprites : triés du plus loin au plus proche, puis clippés colonne par colonne via z-buffer
         double fov = Math.toRadians(GameConfig.FOV);
-
-        // 3. Dessin des objets (Ordre Back-to-Front fourni par BSPParcours)
-        for (Object[] item : objects) {
-            Object obj = item[0];
-
-            if (obj instanceof FourPoints) {
-                drawWall(g2d, (FourPoints) obj);
-            } else if (obj instanceof Sprite) {
-                drawSpriteAndPseudo(g2d, (Sprite) obj, width, height, joueur, fov);
-            }
+        double jx = joueur.getX(), jy = joueur.getY();
+        sprites.sort((a, b) -> {
+            double dxa = a.getX() - jx, dya = a.getY() - jy;
+            double dxb = b.getX() - jx, dyb = b.getY() - jy;
+            return Double.compare(dxb * dxb + dyb * dyb, dxa * dxa + dya * dya);
+        });
+        for (Sprite sprite : sprites) {
+            drawSpriteAndPseudo(g2d, sprite, width, height, joueur, fov, zBuffer);
         }
 
         g2d.dispose();
-
         g.drawImage(buffer, 0, 0, null);
     }
 
@@ -60,48 +62,82 @@ public class Renderer {
 
         g2d.setColor(Color.GRAY);
         g2d.fillPolygon(poly);
-
         g2d.setColor(Color.WHITE);
         g2d.drawPolygon(poly);
     }
 
-    private void drawSpriteAndPseudo(Graphics2D g2d, Sprite sprite, int w, int h, Joueur j, double fov) {
+    private void drawSpriteAndPseudo(Graphics2D g2d, Sprite sprite, int w, int h,
+                                     Joueur j, double fov, double[] zBuffer) {
         double dx = sprite.getX() - j.getX();
         double dy = sprite.getY() - j.getY();
 
-        // Calcul de l'angle et distance
         double angleDiff = Math.atan2(dy, dx) - j.getAngle();
-        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+        while (angleDiff >  Math.PI) angleDiff -= 2 * Math.PI;
         while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
         if (Math.abs(angleDiff) > fov) return;
 
+        // Profondeur caméra (même métrique que le z-buffer des murs)
+        double cosA = Math.cos(j.getAngle());
+        double sinA = Math.sin(j.getAngle());
+        double spriteCameraZ = dx * cosA + dy * sinA;
+        if (spriteCameraZ < 0.1) return;
+
         double dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 0.1 || dist > 5000) return;
+        if (dist > 5000) return;
 
         int spriteSize = (int) (h / dist);
+        if (spriteSize <= 0) return;
+
         int screenX = (int) ((0.5 + angleDiff / fov) * w);
-        int drawX = screenX - spriteSize / 2;
-        int drawY = h / 2 - spriteSize / 2;
+        int drawX   = screenX - spriteSize / 2;
+        int drawY   = h / 2   - spriteSize / 2;
 
-        // Dessin du Sprite
-        g2d.drawImage(sprite.getImage(), drawX, drawY, spriteSize, spriteSize, null);
+        BufferedImage img = sprite.getImage();
+        int imgW = img.getWidth();
+        int imgH = img.getHeight();
 
-        // Dessin du Pseudo (si c'est un joueur)
-        String name = sprite.getPlayerName();
-        if (name != null && !name.isEmpty()) {
-            g2d.setFont(new Font("Arial", Font.BOLD, 14));
-            FontMetrics fm = g2d.getFontMetrics();
-            int textWidth = fm.stringWidth(name);
-            int textX = screenX - textWidth / 2;
-            int textY = drawY - 10;
+        // Dessin par spans de colonnes consécutives visibles (évite un drawImage par colonne)
+        boolean visible = false;
+        int spanStart = -1;
+        for (int col = drawX; col <= drawX + spriteSize; col++) {
+            boolean draw = col < drawX + spriteSize
+                    && col >= 0 && col < w
+                    && spriteCameraZ < zBuffer[col];
+            if (draw && spanStart < 0) {
+                spanStart = col;
+            } else if (!draw && spanStart >= 0) {
+                // Fin du span : un seul drawImage pour toutes les colonnes consécutives
+                int texX0 = (spanStart - drawX) * imgW / spriteSize;
+                int texX1 = (col      - drawX) * imgW / spriteSize;
+                texX0 = Math.max(0, Math.min(imgW, texX0));
+                texX1 = Math.max(0, Math.min(imgW, texX1));
+                if (texX1 > texX0) {
+                    g2d.drawImage(img,
+                            spanStart, drawY, col, drawY + spriteSize,
+                            texX0, 0, texX1, imgH,
+                            null);
+                }
+                visible = true;
+                spanStart = -1;
+            }
+        }
 
-            // Fond du pseudo (Style Minecraft)
-            g2d.setColor(new Color(0, 0, 0, 150));
-            g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight());
-
-            g2d.setColor(Color.WHITE);
-            g2d.drawString(name, textX, textY);
+        // Pseudo au-dessus du sprite (seulement si la colonne centrale passe le z-buffer)
+        boolean centerVisible = screenX >= 0 && screenX < w && spriteCameraZ < zBuffer[screenX];
+        if (visible && centerVisible) {
+            String name = sprite.getPlayerName();
+            if (name != null && !name.isEmpty()) {
+                g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                FontMetrics fm = g2d.getFontMetrics();
+                int textWidth = fm.stringWidth(name);
+                int textX = screenX - textWidth / 2;
+                int textY = drawY - 10;
+                g2d.setColor(new Color(0, 0, 0, 150));
+                g2d.fillRect(textX - 4, textY - fm.getAscent(), textWidth + 8, fm.getHeight());
+                g2d.setColor(Color.WHITE);
+                g2d.drawString(name, textX, textY);
+            }
         }
     }
 }

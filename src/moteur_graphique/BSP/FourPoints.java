@@ -10,6 +10,7 @@ import java.awt.Color;
 public class FourPoints {
     public double x0, y0, x1, y1, x2, y2, x3, y3;
     public Color color;
+    public double cz0 = 1.0, cz1 = 1.0;
 
     public FourPoints(double x0, double y0, double x1, double y1, double x2, double y2, double x3, double y3) {
         this.x0 = x0;

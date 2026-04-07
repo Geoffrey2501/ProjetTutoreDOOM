@@ -11,7 +11,7 @@ import java.util.Set;
 
 public class Input extends KeyAdapter implements MouseListener, MouseMotionListener {
 
-    private boolean forward, backward, strafeLeft, strafeRight, turnLeft, turnRight, showScoreboard, escape, mouseLeftClicked;
+    private boolean forward, backward, strafeLeft, strafeRight, turnLeft, turnRight, showScoreboard, escape, mouseLeftClicked, sprint;
     private int mouseX, mouseY;
 
     /**
@@ -45,6 +45,7 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
             case KeyEvent.VK_RIGHT                  -> turnRight = down;
             case KeyEvent.VK_TAB                    -> showScoreboard = down;
             case KeyEvent.VK_ESCAPE                 -> escape = down;
+            case KeyEvent.VK_SHIFT                  -> sprint = down;
             default -> { /* Touche non gérée donc ignorée */ }
         }
     }
@@ -96,6 +97,7 @@ public class Input extends KeyAdapter implements MouseListener, MouseMotionListe
     public boolean isTurnRight() { return turnRight; }
     public boolean isShowScoreboard() { return showScoreboard; }
     public boolean isEscape() { return escape; }
+    public boolean isSprint() { return sprint; }
     public boolean isMouseLeftClicked() { return mouseLeftClicked; }
     public int getMouseX() { return mouseX; }
     public int getMouseY() { return mouseY; }
