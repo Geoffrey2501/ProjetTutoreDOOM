@@ -73,8 +73,8 @@ public class Automate{
     }
 
     private void updatePoursuite() {
-        // On ne perd l'aggro que si la cible est vraiment loin (distance d'abandon)
-        if (monstre.getTarget() == null || monstre.getTarget().distanceFrom(monstre.getX(), monstre.getY()) > 35.0) {
+        // On perd l'aggro si la cible sort de la zone de détection (avec un petit facteur pour éviter les allers-retours)
+        if (monstre.getTarget() == null || monstre.getTarget().distanceFrom(monstre.getX(), monstre.getY()) > monstre.getDistanceDetection() * 1.5) {
             transitionVers(Etat.ATTENTE);
             return;
         }
