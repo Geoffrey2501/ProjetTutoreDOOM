@@ -10,7 +10,7 @@ public class RRT {
 
     private final double DEFAULT_MAX_DISTANCE_POINT = 1.0;
     private final double RAYON_RECHERCHE = 1.5;  // Rayon pour rewiring RRT*
-    private double rayonMonstre = Monstre.RAYON;  // Rayon du monstre pour les collisions
+    private double rayonMonstre = 0.3;  // Rayon du monstre pour les collisions (plus grand que Monstre.RAYON)
 
     private ArrayList<Noeud> noeuds = new ArrayList<>();
     private Noeud debut;

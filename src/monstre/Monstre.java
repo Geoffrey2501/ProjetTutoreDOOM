@@ -6,7 +6,7 @@ import moteur_graphique.CollisionStrategy;
 
 public class Monstre {
 
-    public static final double RAYON = 0.3;
+    public static final double RAYON = 0.25;
 
     // Liste globale pour accéder aux autres monstres (séparation et alerte)
     public static List<Monstre> tousLesMonstres = new ArrayList<>();
@@ -116,20 +116,33 @@ public class Monstre {
         double nextX = x + steering.getVelocityX();
         double nextY = y + steering.getVelocityY();
 
-        // Gestion des collisions
+        // Gestion des collisions améliorée pour les coins
         boolean collisionX = collision.isColliding(nextX, y, RAYON);
         boolean collisionY = collision.isColliding(x, nextY, RAYON);
 
-        // Application du mouvement si aucune collision n'est détectée
+        if (!collisionX && !collisionY && collision.isColliding(nextX, nextY, RAYON)) {
+            // On touche un coin ! Au lieu de juste bloquer, on favorise l'axe
+            // qui nous éloigne le plus de l'obstacle.
+            if (Math.abs(steering.getVelocityX()) > Math.abs(steering.getVelocityY())) {
+                collisionY = true; // On bloque Y pour forcer le glissement en X
+            } else {
+                collisionX = true; // On bloque X pour forcer le glissement en Y
+            }
+        }
+
+        // Application du mouvement avec "Sliding"
         if (!collisionX) {
             x = nextX;
         } else {
-            steering.killVelocityX(); // Au lieu de réinitialiser toute la direction, on arrête juste d'avancer sur l'axe bloqué
+            // Si bloqué en X, on donne un petit bonus de vitesse en Y
+            // pour aider à "glisser" le long du mur
+            steering.killVelocityX();
         }
 
         if (!collisionY) {
             y = nextY;
         } else {
+            // Si bloqué en Y, on donne un petit bonus de vitesse en X
             steering.killVelocityY();
         }
     }
@@ -318,8 +331,9 @@ public class Monstre {
     private void repousserMur() {
         double separationX = 0;
         double separationY = 0;
-        double probeDistance = RAYON + 0.2; // Sonder un peu plus loin que la hitbox
-        int numProbes = 8;
+        // On augmente la distance de détection (RAYON + 0.4 au lieu de 0.2)
+        double probeDistance = RAYON + 0.4;
+        int numProbes = 12; // Plus de sondes pour une détection plus fine des coins
 
         for (int i = 0; i < numProbes; i++) {
             double angle = 2 * Math.PI * i / numProbes;
@@ -327,19 +341,24 @@ public class Monstre {
             double probeY = y + probeDistance * Math.sin(angle);
 
             if (collision.isColliding(probeX, probeY, RAYON)) {
-                // Pousser dans la direction opposée au mur
+                // Force inversement proportionnelle à la distance (plus on est près, plus on pousse)
                 separationX -= Math.cos(angle);
                 separationY -= Math.sin(angle);
             }
         }
 
-        // Normaliser et appliquer la force de séparation
         double mag = Math.sqrt(separationX * separationX + separationY * separationY);
         if (mag > 0) {
-            double separationForce = 0.5; // Force de répulsion assez forte
-            separationX = (separationX / mag) * separationForce;
-            separationY = (separationY / mag) * separationForce;
-            steering.applySeparation(separationX, separationY);
+            // Force de répulsion plus importante (1.2 au lieu de 0.5)
+            double separationForce = 1.2;
+            // L'ajout d'un petit mouvement aléatoire évite les équilibres parfaits dans les coins
+            separationX = (separationX / mag) * separationForce + (Math.random() - 0.5) * 0.05;
+            separationY = (separationY / mag) * separationForce + (Math.random() - 0.5) * 0.05;
+
+            // On applique directement sur la position pour un dégagement immédiat
+            // plutôt que de passer uniquement par le steering qui est parfois trop lent
+            if (!collision.isColliding(x + separationX * 0.1, y, RAYON)) x += separationX * 0.02;
+            if (!collision.isColliding(x, y + separationY * 0.1, RAYON)) y += separationY * 0.02;
         }
     }
 
