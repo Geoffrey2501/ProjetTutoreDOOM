@@ -128,7 +128,7 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
                 // Configurer les bornes de la carte BSP pour le RRT*
                 m.setMapBounds(-40.0, -40.0, 40.0, 40.0);
                 // Initialiser les points de patrouille pour que l'automate puisse passer en PATROUILLE
-                m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() + 5.0, m.getY() + 5.0));
+                m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() - 10.0, m.getY() - 10.0));
                 monsterSpriteManager.onMonsterMove(String.valueOf(m.hashCode()), m.getX(), m.getY());
             }
 
