@@ -194,6 +194,14 @@ public class Monstre {
         this.pointB = b;
     }
 
+    /**
+     * Configure les bornes de la carte pour l'algorithme RRT*.
+     * Nécessaire pour les cartes BSP avec des coordonnées négatives.
+     */
+    public void setMapBounds(double minX, double minY, double maxX, double maxY) {
+        this.rrt.setMapBounds(minX, minY, maxX, maxY);
+    }
+
     public Automate.Etat getEtat(){
         return automate.getEtat();
     }

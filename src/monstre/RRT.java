@@ -15,24 +15,33 @@ public class RRT {
     private ArrayList<Noeud> noeuds = new ArrayList<>();
     private Noeud debut;
     private Noeud fin;
-    private double mapLargeur = 100.0;
-    private double mapHauteur = 100.0;
+    private double mapMinX = 0.0;
+    private double mapMinY = 0.0;
+    private double mapMaxX = 100.0;
+    private double mapMaxY = 100.0;
 
     public RRT(CollisionStrategy collision) {
         this.collision = collision;
     }
 
+    /**
+     * Définit les bornes de la carte pour la génération de points aléatoires.
+     * Important pour les cartes BSP qui peuvent avoir des coordonnées négatives.
+     */
+    public void setMapBounds(double minX, double minY, double maxX, double maxY) {
+        this.mapMinX = minX;
+        this.mapMinY = minY;
+        this.mapMaxX = maxX;
+        this.mapMaxY = maxY;
+    }
+
     public Noeud trouverChemin(double startX, double startY, double endX, double endY) {
         noeuds.clear();
-        // Ne pas effacer l'arbre existant - on l'étend
         debut = new Noeud(startX, startY);
         debut.setCout(0);
         fin = new Noeud(endX, endY);
 
-        // Ajouter le debut seulement si l'arbre est vide
-        if (noeuds.isEmpty()) {
-            noeuds.add(debut);
-        }
+        noeuds.add(debut);
 
         Noeud meilleurVersLaFin = null;
 
@@ -189,10 +198,12 @@ public class RRT {
             randX = endX;
             randY = endY;
         } else {
+            int tentatives = 0;
             do {
-                randX = Math.random() * mapLargeur;
-                randY = Math.random() * mapHauteur;
-            } while (collision.isColliding(randX, randY, rayonMonstre));
+                randX = mapMinX + Math.random() * (mapMaxX - mapMinX);
+                randY = mapMinY + Math.random() * (mapMaxY - mapMinY);
+                tentatives++;
+            } while (collision.isColliding(randX, randY, rayonMonstre) && tentatives < 1000);
         }
         return new double[] {randX, randY};
     }
