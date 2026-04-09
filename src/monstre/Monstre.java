@@ -140,7 +140,10 @@ public class Monstre {
         // Le RRT va d'abord chercher dans ses souvenirs (graphe existant)
         Noeud finChemin = rrt.trouverChemin(x, y, destination.getX(), destination.getY());
 
-        if (finChemin == null) return;
+        if (finChemin == null) {
+            arrived = false; // Empecher la boucle infinie d'alternance si le chemin echoue
+            return;
+        }
 
         chemin.clear();
         waypointIndex = 0;
