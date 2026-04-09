@@ -25,7 +25,7 @@ public class Monstre {
     private Noeud destination;
 
     private Target target;
-    private double distanceDetection = 10.0;
+    private double distanceDetection = 5.0;
 
     private final Automate automate;
 

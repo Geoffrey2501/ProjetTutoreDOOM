@@ -115,9 +115,9 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
 
         if (useBSP && isHost) {
             List<Monstre> advancedMonsters = Arrays.asList(
-                new Monstre(10.0, 10.0, collision),
-                new Monstre(12.0, 10.0, collision),
-                new Monstre(10.0, 12.0, collision)
+                new Monstre(-5.0, -5.0, collision),
+                new Monstre(-8.0, -5.0, collision),
+                new Monstre(-5.0, -8.0, collision)
             );
 
             // Initialize a temporary target using the player's position
@@ -126,9 +126,9 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
             for (Monstre m : advancedMonsters) {
                 m.setTarget(playerTarget);
                 // Configurer les bornes de la carte BSP pour le RRT*
-                m.setMapBounds(-40.0, -40.0, 40.0, 40.0);
+                m.setMapBounds(-18.0, -18.0, 18.0, 18.0);
                 // Initialiser les points de patrouille pour que l'automate puisse passer en PATROUILLE
-                m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() - 10.0, m.getY() - 10.0));
+                m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() + 10.0, m.getY() + 10.0));
                 monsterSpriteManager.onMonsterMove(String.valueOf(m.hashCode()), m.getX(), m.getY());
             }
 
