@@ -124,13 +124,13 @@ public class Monstre {
         if (!collisionX) {
             x = nextX;
         } else {
-            steering.reset(); // On stoppe la force si on tape un mur
+            steering.killVelocityX(); // Au lieu de réinitialiser toute la direction, on arrête juste d'avancer sur l'axe bloqué
         }
 
         if (!collisionY) {
             y = nextY;
         } else {
-            steering.reset();
+            steering.killVelocityY();
         }
     }
 
