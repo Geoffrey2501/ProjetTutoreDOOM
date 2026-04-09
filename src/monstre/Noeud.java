@@ -4,15 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Noeud {
-    private int x;
-    private int y;
+    private double x;
+    private double y;
     private Noeud parent;  // Pour RRT*
     private double cout;   // Coût depuis le départ
 
     private List<Noeud> voisins;
 
 
-    public Noeud(int x, int y) {
+    public Noeud(double x, double y) {
         this.x = x;
         this.y = y;
         this.voisins = new ArrayList<Noeud>();
@@ -20,15 +20,15 @@ public class Noeud {
         this.cout = Double.MAX_VALUE;
     }
 
-    public int[] getCoordonnees() {
-        return new int[] {x, y};
+    public double[] getCoordonnees() {
+        return new double[] {x, y};
     }
 
-    public int getX() {
+    public double getX() {
         return x;
     }
 
-    public int getY() {
+    public double getY() {
         return y;
     }
 

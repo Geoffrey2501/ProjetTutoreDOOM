@@ -2,17 +2,19 @@ package monstre;
 
 import java.util.ArrayList;
 import java.util.List;
+import moteur_graphique.CollisionStrategy;
 
 public class Monstre {
 
-    public static final int RAYON = 5;
-    
+    public static final double RAYON = 0.3;
+
     // Liste globale pour accéder aux autres monstres (séparation et alerte)
     public static List<Monstre> tousLesMonstres = new ArrayList<>();
 
     private double x, y;
     private final SteeringBehavior steering;
-    private final Map map;
+    private final CollisionStrategy collision;
+    private final RRT rrt;
 
     private List<Noeud> chemin = new ArrayList<>();
     private int waypointIndex = 0;
@@ -23,14 +25,14 @@ public class Monstre {
     private Noeud destination;
 
     private Target target;
-    private double distanceDetection = 50;
+    private double distanceDetection = 10.0;
 
     private final Automate automate;
 
     private long dernierRecalcul = 0;
     private double lastTargetX = -1;
     private double lastTargetY = -1;
-    private final double SEUIL_MOUVEMENT = 10.0; // Distance minimum pour justifier un recalcul
+    private final double SEUIL_MOUVEMENT = 1.0; // Distance minimum pour justifier un recalcul
 
     // Variables pour l'alerte
     private double alerteX = -1;
@@ -38,10 +40,11 @@ public class Monstre {
 
     // ===================== CONSTRUCTEUR =====================
 
-    public Monstre(double x, double y, Map map) {
+    public Monstre(double x, double y, CollisionStrategy collision) {
         this.x = x;
         this.y = y;
-        this.map = map;
+        this.collision = collision;
+        this.rrt = new RRT(this.collision);
         this.steering = new SteeringBehavior();
         this.automate = new Automate(this);
         tousLesMonstres.add(this);
@@ -89,16 +92,16 @@ public class Monstre {
 
         Noeud cible = chemin.get(waypointIndex);
         double distToTarget = distance(cible);
-         repousserMur();
+        repousserMur();
 
         // Changement de waypoint si on est assez proche
-        if (distToTarget < 10 && waypointIndex < chemin.size() - 1) {
+        if (distToTarget < 0.5 && waypointIndex < chemin.size() - 1) {
             waypointIndex++;
             return;
         }
 
         // Arrêt final au dernier point
-        if (waypointIndex == chemin.size() - 1 && distToTarget < 5) {
+        if (waypointIndex == chemin.size() - 1 && distToTarget < 0.2) {
             x = cible.getX();
             y = cible.getY();
             arrived = true;
@@ -113,22 +116,9 @@ public class Monstre {
         double nextX = x + steering.getVelocityX();
         double nextY = y + steering.getVelocityY();
 
-        // Gestion des collisions par itération sur getMurs()
-        boolean collisionX = false;
-        boolean collisionY = false;
-
-        // On définit une boîte de collision simple pour le monstre
-        // On utilise RAYON pour donner de l'épaisseur au monstre
-        for (Mur mur : map.getMurs()) {
-            // Test collision sur l'axe X
-            if (mur.esDansMur((int) nextX, (int) y)) {
-                collisionX = true;
-            }
-            // Test collision sur l'axe Y
-            if (mur.esDansMur((int) x, (int) nextY)) {
-                collisionY = true;
-            }
-        }
+        // Gestion des collisions
+        boolean collisionX = collision.isColliding(nextX, y, RAYON);
+        boolean collisionY = collision.isColliding(x, nextY, RAYON);
 
         // Application du mouvement si aucune collision n'est détectée
         if (!collisionX) {
@@ -144,11 +134,11 @@ public class Monstre {
         }
     }
 
-    private void recalculerChemin() {
+    public void recalculerChemin() {
         if (destination == null) return;
 
         // Le RRT va d'abord chercher dans ses souvenirs (graphe existant)
-        Noeud finChemin = RRT.trouverChemin((int) x, (int) y, destination.getX(), destination.getY());
+        Noeud finChemin = rrt.trouverChemin(x, y, destination.getX(), destination.getY());
 
         if (finChemin == null) return;
 
@@ -166,8 +156,8 @@ public class Monstre {
     /**
      * Méthode générique pour calculer un chemin vers n'importe quelle coordonnée
      */
-    public void recalculerCheminVers(int targetX, int targetY) {
-        Noeud fin = RRT.trouverChemin((int) x, (int) y, targetX, targetY);
+    public void recalculerCheminVers(double targetX, double targetY) {
+        Noeud fin = rrt.trouverChemin(x, y, targetX, targetY);
 
         if (fin == null) return;
 
@@ -202,6 +192,14 @@ public class Monstre {
     public void setPointsPatrouille(Noeud a, Noeud b) {
         this.pointA = a;
         this.pointB = b;
+    }
+
+    /**
+     * Configure les bornes de la carte pour l'algorithme RRT*.
+     * Nécessaire pour les cartes BSP avec des coordonnées négatives.
+     */
+    public void setMapBounds(double minX, double minY, double maxX, double maxY) {
+        this.rrt.setMapBounds(minX, minY, maxX, maxY);
     }
 
     public Automate.Etat getEtat(){
@@ -263,7 +261,7 @@ public class Monstre {
         // On ne recalcule que si le chemin est vide OU si la cible a bougé significativement,
         // ET uniquement si 500ms se sont écoulées depuis le dernier recalcul pour éviter de lagguer.
         if ((chemin.isEmpty() || arrived || distanceCibleBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
-            recalculerCheminVers((int)target.getX(), (int)target.getY());
+            recalculerCheminVers(target.getX(), target.getY());
 
             // Mise à jour de la dernière position connue
             lastTargetX = target.getX();
@@ -286,7 +284,7 @@ public class Monstre {
 
         // Limitation du recalcul à 1 fois par 500ms maximum
         if ((chemin.isEmpty() || arrived || distanceAlerteBougee > SEUIL_MOUVEMENT) && (currentTime - dernierRecalcul > 500)) {
-            recalculerCheminVers((int)alerteX, (int)alerteY);
+            recalculerCheminVers(alerteX, alerteY);
             lastTargetX = alerteX;
             lastTargetY = alerteY;
             dernierRecalcul = currentTime;
@@ -317,15 +315,15 @@ public class Monstre {
     private void repousserMur() {
         double separationX = 0;
         double separationY = 0;
-        double probeDistance = RAYON + 4; // Sonder un peu plus loin que la hitbox
+        double probeDistance = RAYON + 0.2; // Sonder un peu plus loin que la hitbox
         int numProbes = 8;
 
         for (int i = 0; i < numProbes; i++) {
             double angle = 2 * Math.PI * i / numProbes;
-            int probeX = (int) (x + probeDistance * Math.cos(angle));
-            int probeY = (int) (y + probeDistance * Math.sin(angle));
+            double probeX = x + probeDistance * Math.cos(angle);
+            double probeY = y + probeDistance * Math.sin(angle);
 
-            if (map.estDansMur(probeX, probeY)) {
+            if (collision.isColliding(probeX, probeY, RAYON)) {
                 // Pousser dans la direction opposée au mur
                 separationX -= Math.cos(angle);
                 separationY -= Math.sin(angle);
@@ -377,8 +375,8 @@ public class Monstre {
      */
     public void alerterAutresMonstres() {
         if (target == null) return;
-        double rayonAlerte = 300.0;
-        
+        double rayonAlerte = 15.0;
+
         // On crie sa propre position ou celle de la cible pour alerter
         for (Monstre autre : tousLesMonstres) {
             if (autre != this && autre.getEtat() != Automate.Etat.POURSUITE) {

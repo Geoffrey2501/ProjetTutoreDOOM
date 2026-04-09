@@ -6,6 +6,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.*;
 import java.util.List;
+
+import monstre.Monstre;
+import monstre.Target;
+
 import moteur_graphique.BSP.BSPParcours;
 import moteur_graphique.BSP.CollisionBSP;
 import moteur_graphique.BSP.MapMur;
@@ -110,17 +114,56 @@ public class MainGameMultiplayer implements GameLoopListener, NetworkListener {
         boolean isHost = (serverIp == null || serverIp.isEmpty() || serverPort <= 0);
 
         if (useBSP && isHost) {
-            List<MonsterState> initialMonsters = Arrays.asList(
-                new MonsterState("DarkJonesy_1", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y + 5),
-                new MonsterState("DarkJonesy_2", GameConfig.PLAYER_START_X - 5, GameConfig.PLAYER_START_Y + 5),
-                new MonsterState("DarkJonesy_3", GameConfig.PLAYER_START_X + 5, GameConfig.PLAYER_START_Y - 5)
+            List<Monstre> advancedMonsters = Arrays.asList(
+                new Monstre(10.0, 10.0, collision),
+                new Monstre(12.0, 10.0, collision),
+                new Monstre(10.0, 12.0, collision)
             );
-            for (MonsterState m : initialMonsters) {
-                monsterSpriteManager.onMonsterMove(m.id, m.pos[0], m.pos[1]);
-                network.sendMonsterPosition(m.id, m.pos[0], m.pos[1]);
+
+            // Initialize a temporary target using the player's position
+            Target playerTarget = new Target(joueur);
+
+            for (Monstre m : advancedMonsters) {
+                m.setTarget(playerTarget);
+                // Configurer les bornes de la carte BSP pour le RRT*
+                m.setMapBounds(-40.0, -40.0, 40.0, 40.0);
+                // Initialiser les points de patrouille pour que l'automate puisse passer en PATROUILLE
+                m.setPointsPatrouille(new monstre.Noeud(m.getX(), m.getY()), new monstre.Noeud(m.getX() + 5.0, m.getY() + 5.0));
+                monsterSpriteManager.onMonsterMove(String.valueOf(m.hashCode()), m.getX(), m.getY());
             }
+
+            monsterThread = new Thread(() -> {
+                try {
+                    while (!Thread.currentThread().isInterrupted()) {
+                        for (Monstre m : advancedMonsters) {
+                            Joueur closestPlayer = joueur;
+                            double minDistanceSq = Math.pow(joueur.getX() - m.getX(), 2) + Math.pow(joueur.getY() - m.getY(), 2);
+
+                            for (Joueur remote : network.getRemotePlayers().values()) {
+                                double remoteDistSq = Math.pow(remote.getX() - m.getX(), 2) + Math.pow(remote.getY() - m.getY(), 2);
+                                if (remoteDistSq < minDistanceSq) {
+                                    minDistanceSq = remoteDistSq;
+                                    closestPlayer = remote;
+                                }
+                            }
+
+                            if (m.getTarget() == null || !m.getTarget().getId().equals(closestPlayer.getId())) {
+                                m.setTarget(new Target(closestPlayer));
+                            }
+
+                            m.update();
+                            String monsterId = String.valueOf(m.hashCode());
+                            monsterSpriteManager.onMonsterMove(monsterId, m.getX(), m.getY());
+                            network.sendMonsterPosition(monsterId, m.getX(), m.getY());
+                        }
+                        Thread.sleep(50); // Mettre à jour à ~20 FPS (50ms)
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            monsterThread.start();
             network.announceMonsterHost();
-            startMonsterThread(initialMonsters);
         }
 
         gameLoop = new GameLoop(this);

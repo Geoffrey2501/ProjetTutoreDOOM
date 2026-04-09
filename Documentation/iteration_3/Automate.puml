@@ -7,12 +7,18 @@ state Patrouille
 
 state Poursuite
 
+state Alerte
+
 Attente --> Patrouille : apres(delai)
 Patrouille --> Attente : finPatrouille
 
 Attente --> Poursuite : cibleDetectee
 Patrouille --> Poursuite : cibleDetectee
+Alerte --> Poursuite : cibleDetectee
+
+Attente --> Alerte : recoitAlerte
+Patrouille --> Alerte : recoitAlerte
 
 Poursuite --> Attente : ciblePerdue
+Alerte --> Attente : ciblePerdue
 @enduml
-

@@ -74,7 +74,7 @@ public class Automate{
 
     private void updatePoursuite() {
         // On ne perd l'aggro que si la cible est vraiment loin (distance d'abandon)
-        if (monstre.getTarget() == null || monstre.getTarget().distanceFrom(monstre.getX(), monstre.getY()) > 350) {
+        if (monstre.getTarget() == null || monstre.getTarget().distanceFrom(monstre.getX(), monstre.getY()) > 35.0) {
             transitionVers(Etat.ATTENTE);
             return;
         }
@@ -115,6 +115,9 @@ public class Automate{
 
         if (nouvelEtat == Etat.POURSUITE) {
             monstre.resetSteering();
+            if (monstre.getTarget() != null) {
+                monstre.recalculerCheminVers(monstre.getTarget().getX(), monstre.getTarget().getY());
+            }
             // L'alerte est gérée directement dans updatePoursuite pour être continue
         }
 
