@@ -36,14 +36,6 @@ all: $(BIN_DIR)
 run: all
 	$(JAVA) -cp $(BIN_DIR) $(MAIN_CLASS)
 
-## Compile et lance la démo RRT
-run-rrt: all
-	$(JAVA) -cp $(BIN_DIR) $(RRT_CLASS)
-
-## Compile et lance la démo RRT progressive
-run-rrt-prog: all
-	$(JAVA) -cp $(BIN_DIR) $(RRT_PROG_CLASS)
-
 ## Crée le dossier de sortie
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -60,8 +52,6 @@ help:
 	@echo ""
 	@echo "  make            Compile toutes les sources"
 	@echo "  make run        Compile et lance le jeu multijoueur"
-	@echo "  make run-rrt    Compile et lance la demo RRT"
-	@echo "  make run-rrt-prog  Compile et lance la demo RRT progressive"
 	@echo "  make clean      Supprime les fichiers compiles"
 	@echo "  make help       Affiche cette aide"
 	@echo ""
